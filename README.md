@@ -1,13 +1,11 @@
-
-
-
-
-
 Studio.OS | Interior Decor Business Management
 Studio.OS is a professional-grade, full-stack operational management platform designed specifically for interior design boutique firms. It replaces scattered spreadsheets and messy paperwork with a centralized, secure, and visually stunning "command center" for business owners and design teams.
 🚀 Live Demo
-Frontend: [Your Vercel URL Here]
-Backend API: [Your Render URL Here]
+Frontend: [https://interior-design-management-system-6ytdzrf9u.vercel.app/]
+Demo credentials
+:username-admin
+ password-TemporaryPassword123!
+Backend API: [https://interior-design-management-system.onrender.com]
 🧠 The Problem It Solves
 Independent designers and small studios often struggle with fragmented data. Client contact info is in one place, project statuses in another, and financial balances are buried in bank statements.
 Studio.OS solves this by:
@@ -72,4 +70,16 @@ npm run dev
 Money Handling: Uses DecimalField (not Float) to ensure 100% mathematical accuracy for financial totals.
 Custom User Model: Built using AbstractUser to allow for Admin vs Staff roles from day one.
 JWT Interceptors: Automatically attaches Authorization headers to all outgoing requests to ensure a seamless "Logged In" experience.
+
 Developed with 🖤 for the Interior Design Industry.
+<img width="359" height="406" alt="Screenshot 2026-02-15 at 20 59 54" src="https://github.com/user-attachments/assets/1c5b6bd9-1c30-400b-aaa2-acd1730140d3" />
+<img width="351" height="401" alt="Screenshot 2026-02-15 at 20 59 35" src="https://github.com/user-attachments/assets/5b43affd-56ae-4759-848e-fac30c35e4be" />
+<img width="1439" height="812" alt="Screenshot 2026-02-15 at 20 59 13" src="https://github.com/user-attachments/assets/a4763cb9-039d-47ed-9e30-a1c4d8f78ddd" />
+<img width="393" height="608" alt="Screenshot 2026-02-15 at 20 58 50" src="https://github.com/user-attachments/assets/b728440d-f910-46f2-aab6-56d706771500" />
+<img width="443" height="437" alt="Screenshot 2026-02-15 at 20 58 18" src="https://github.com/user-attachments/assets/36d5851c-4e0a-4f14-a4d3-e9cd5ff6d1a0" />
+<img width="436" height="437" alt="Screenshot 2026-02-15 at 20 57 45" src="https://github.com/user-attachments/assets/4a72dc9c-056f-4595-bb9a-158241ce7b11" />
+<img width="438" height="487" alt="Screenshot 2026-02-15 at 20 57 21" src="https://github.com/user-attachments/assets/afe352d1-e574-41c2-8290-8ebc258d7bae" />
+<img width="1440" height="815" alt="Screenshot 2026-02-15 at 20 56 57" src="https://github.com/user-attachments/assets/ce89e189-38bd-4537-b968-c1b2594ac85e" />
+<img width="1439" height="812" alt="Screenshot 2026-02-15 at 20 54 08" src="https://github.com/user-attachments/assets/e975fd16-8e01-4399-8bf1-1412049f174a" />
+<img width="1439" height="815" alt="Screenshot 2026-02-15 at 20 53 35" src="https://github.com/user-attachments/assets/0df35e9e-55ba-4490-9dcb-47c02ed84203" />
+
