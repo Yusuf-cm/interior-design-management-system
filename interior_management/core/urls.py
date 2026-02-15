@@ -1,26 +1,16 @@
-"""
-URL configuration for core project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponse # Add this import
+
+# Simple view for Render's health check
+def health_check(request):
+    return HttpResponse("Studio.OS API is Running", status=200)
 
 urlpatterns = [
+    path('', health_check), # This is the "Heartbeat" for Render
     path('admin/', admin.site.urls),
     path('api/accounts/', include('apps.accounts.urls')),
     path('api/customers/', include('apps.customers.urls')),
-    path('api/jobs/',include('apps.jobs.urls')),
+    path('api/jobs/', include('apps.jobs.urls')),
     path('api/dashboard/', include('apps.dashboard.urls')),
 ]
