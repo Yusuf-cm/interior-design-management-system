@@ -13,6 +13,7 @@ const Projects = () => {
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [error, setError] = useState('');
   
   // Track if we are in "Edit" mode or "Create" mode
   const [isEditing, setIsEditing] = useState(false);
@@ -30,6 +31,7 @@ const Projects = () => {
   const fetchData = async () => {
     setFetching(true);
     try {
+      setError('');
       // Fetch both Jobs and Customers (Customers needed for the dropdown)
       const [jobsRes, custRes] = await Promise.all([
         api.get('jobs/'),
@@ -39,7 +41,8 @@ const Projects = () => {
       // Format customers for the Mantine Select component
       setCustomers(custRes.data.map(c => ({ value: c.id.toString(), label: c.name })));
     } catch (err) { 
-      console.error("Error fetching project data:", err); 
+      console.error("Error fetching project data:", err);
+      setError('Could not load projects. Please try again.');
     } finally {
       setFetching(false);
     }
@@ -51,6 +54,7 @@ const Projects = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       if (isEditing) {
         // UPDATE existing record
@@ -62,7 +66,8 @@ const Projects = () => {
       setOpened(false);
       fetchData(); // Refresh the list
     } catch (err) { 
-        console.error("Submission failed:", err); 
+        console.error("Submission failed:", err);
+        setError(err.response?.data?.detail || 'Could not save the project. Check the details and try again.');
     } finally { 
         setLoading(false); 
     }
@@ -129,7 +134,7 @@ const Projects = () => {
         </Table.Td>
         <Table.Td style={{ minWidth: '180px' }}>
           <Group justify="space-between" mb={5}>
-            <Text size="xs" fw={700}>${project.actual_payment_received} / ${project.estimated_cost}</Text>
+            <Text size="xs" fw={700}>KES ${Number(project.actual_payment_received).toLocaleString('en-KE')} / KES ${Number(project.estimated_cost).toLocaleString('en-KE')}</Text>
             <Text size="xs" c="dimmed">{Math.round(progress)}%</Text>
           </Group>
           <Progress 
@@ -142,7 +147,7 @@ const Projects = () => {
         </Table.Td>
         <Table.Td>
           <Text size="xs" fw={700} c={project.remaining_balance > 0 ? 'red.7' : 'green.7'}>
-            {project.remaining_balance > 0 ? `Owed: $${project.remaining_balance}` : 'Settled'}
+            {project.remaining_balance > 0 ? `Owed: KES ${Number(project.remaining_balance).toLocaleString('en-KE')}` : 'Settled'}
           </Text>
         </Table.Td>
         <Table.Td>
@@ -168,6 +173,7 @@ const Projects = () => {
         </Button>
       </Group>
 
+      {error && <Text c="red" size="sm" mb="md">{error}</Text>}
       <Paper p="md" radius="lg" withBorder style={{ background: 'rgba(255,255,255,0.5)', backdropFilter: 'blur(10px)' }}>
         {projects.length > 0 ? (
           <Table verticalSpacing="md" highlightOnHover>
@@ -232,14 +238,14 @@ const Projects = () => {
             
             <Group grow>
               <NumberInput 
-                label="Contract Value ($)" 
+                label="Contract Value (KES)" 
                 hideControls 
                 min={0}
                 value={formData.estimated_cost}
                 onChange={(val) => setFormData({...formData, estimated_cost: val})} 
               />
               <NumberInput 
-                label={isEditing ? "Payments to Date ($)" : "Initial Deposit ($)"}
+                label={isEditing ? "Payments to Date (KES)" : "Initial Deposit (KES)"}
                 hideControls 
                 min={0}
                 value={formData.actual_payment_received}
