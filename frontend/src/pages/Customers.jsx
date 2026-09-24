@@ -12,13 +12,20 @@ const Customers = () => {
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   
   // Form State
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', address: '' });
 
   const fetchCustomers = async () => {
-    const res = await api.get(`customers/?search=${search}`);
-    setCustomers(res.data);
+    try {
+      setError('');
+      const res = await api.get(`customers/?search=${search}`);
+      setCustomers(res.data);
+    } catch (err) {
+      console.error(err);
+      setError('Could not load customers. Please try again.');
+    }
   };
 
   useEffect(() => { fetchCustomers(); }, [search]);
@@ -26,13 +33,29 @@ const Customers = () => {
   const handleAddCustomer = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       await api.post('customers/', formData);
       setOpened(false);
       setFormData({ name: '', email: '', phone: '', address: '' });
       fetchCustomers();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.email?.[0] || 'Could not save the customer.');
+    }
     finally { setLoading(false); }
+  };
+
+  const handleDeleteCustomer = async (customer) => {
+    if (!window.confirm(`Delete ${customer.name}? This cannot be undone.`)) return;
+    try {
+      setError('');
+      await api.delete(`customers/${customer.id}/`);
+      setCustomers((current) => current.filter((item) => item.id !== customer.id));
+    } catch (err) {
+      console.error(err);
+      setError('Could not delete this customer. They may still be linked to project records.');
+    }
   };
 
   const rows = customers.map((customer) => (
@@ -50,7 +73,12 @@ const Customers = () => {
         <Text size="xs" c="dimmed" truncate>{customer.address}</Text>
       </Table.Td>
       <Table.Td>
-        <ActionIcon variant="subtle" color="red" onClick={() => {/* Add Delete Logic */}}>
+        <ActionIcon
+          variant="subtle"
+          color="red"
+          aria-label={`Delete ${customer.name}`}
+          onClick={() => handleDeleteCustomer(customer)}
+        >
           <IconTrash size={16} />
         </ActionIcon>
       </Table.Td>
@@ -66,6 +94,7 @@ const Customers = () => {
         </Button>
       </Group>
 
+      {error && <Text c="red" size="sm" mb="md">{error}</Text>}
       <Paper p="md" radius="lg" withBorder style={{ background: 'rgba(255,255,255,0.5)', backdropFilter: 'blur(10px)' }}>
         <TextInput
           placeholder="Search by name, email or phone..."
