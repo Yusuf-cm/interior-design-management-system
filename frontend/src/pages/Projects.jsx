@@ -3,7 +3,7 @@ import {
   Table, Badge, Group, Text, ActionIcon, Paper, Title, Button, 
   Modal, TextInput, Select, NumberInput, Stack, Progress, Box, Center, Loader
 } from '@mantine/core';
-import { IconPlus, IconPencil, IconBriefcase, IconCurrencyDollar, IconAlertCircle } from '@tabler/icons-react';
+import { IconPlus, IconPencil, IconBriefcase, IconAlertCircle } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 import api from '../api';
 
@@ -134,7 +134,7 @@ const Projects = () => {
         </Table.Td>
         <Table.Td style={{ minWidth: '180px' }}>
           <Group justify="space-between" mb={5}>
-            <Text size="xs" fw={700}>KES ${Number(project.actual_payment_received).toLocaleString('en-KE')} / KES ${Number(project.estimated_cost).toLocaleString('en-KE')}</Text>
+            <Text size="xs" fw={700}>KES {Number(project.actual_payment_received).toLocaleString('en-KE')} / KES {Number(project.estimated_cost).toLocaleString('en-KE')}</Text>
             <Text size="xs" c="dimmed">{Math.round(progress)}%</Text>
           </Group>
           <Progress 
