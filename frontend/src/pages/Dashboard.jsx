@@ -28,7 +28,7 @@ const Dashboard = ({ data, onNewProject }) => {
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
         <StatsCard title="Clients" value={data?.metrics?.total_customers || 0} icon={IconUsers} color="blue" delay={0.1} />
         <StatsCard title="Active Jobs" value={data?.metrics?.active_jobs || 0} icon={IconBriefcase} color="orange" delay={0.2} />
-        <StatsCard title="Revenue" value={`$${data?.financials?.total_revenue || 0}`} icon={IconCurrencyDollar} color="green" delay={0.3} />
+        <StatsCard title="Revenue" value={`KES ${Number(data?.financials?.total_revenue || 0).toLocaleString('en-KE')}`} icon={IconCurrencyDollar} color="green" delay={0.3} />
       </SimpleGrid>
 
       <Box mt={40}>
