@@ -19,6 +19,9 @@ class JobSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        for field in ['estimated_cost', 'actual_payment_received']:
+            if field in attrs and attrs[field] < 0:
+                raise serializers.ValidationError({field: 'Enter a non-negative amount.'})
         user = self.context['request'].user
         if user.role != User.IS_ADMIN:
             customer = attrs.get('customer')
