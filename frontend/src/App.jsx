@@ -18,10 +18,13 @@ function App() {
   const [data, setData] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [currentView, setCurrentView] = useState('dashboard');
   const [opened, { toggle, close }] = useDisclosure();
 
   const fetchInitialData = async () => {
+    setLoading(true);
+    setLoadError('');
     try {
       const [dashRes, profileRes] = await Promise.all([
         api.get('dashboard/summary/'),
@@ -31,6 +34,7 @@ function App() {
       setUser(profileRes.data);
     } catch (err) {
       if (err.response?.status === 401) handleLogout();
+      else setLoadError('We could not load your workspace. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -41,7 +45,10 @@ function App() {
   }, [isAuthenticated]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setData(null);
+    setCurrentView('dashboard');
     setIsAuthenticated(false);
     setUser(null);
   };
@@ -60,6 +67,8 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  if (loadError) return <Center h="100svh"><Stack align="center"><Text role="alert">{loadError}</Text><Button color="dark" onClick={fetchInitialData}>Try again</Button><Button variant="subtle" onClick={handleLogout}>Back to sign in</Button></Stack></Center>;
+
   if (loading) return <Center h="100vh"><Loader color="yellow" size="xl" type="dots" /></Center>;
 
   return (
@@ -68,7 +77,7 @@ function App() {
       navbar={{ width: 280, breakpoint: 'sm', collapsed: { mobile: !opened } }}
       padding="md"
       styles={{
-        main: { background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }
+        main: { background: '#f5f3ee', minHeight: '100vh' }
       }}
     >
       <AppShell.Header p="md" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)' }}>
@@ -84,7 +93,7 @@ function App() {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="md" style={{ background: '#1A1B1E' }}>
+      <AppShell.Navbar p="md" style={{ background: '#18211e', color: '#e6e8e3' }}>
         <Stack justify="space-between" h="100%">
           <Box>
             <NavLink label="Dashboard" leftSection={<IconLayoutDashboard size={20} />} active={currentView === 'dashboard'} color="yellow" onClick={() => { setCurrentView('dashboard'); close(); }} />
