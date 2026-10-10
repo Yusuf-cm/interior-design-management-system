@@ -5,12 +5,13 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'role', 'phone_number', 'first_name', 'last_name']
+        read_only_fields = ['id', 'username', 'role']
 
 class RegisterSerializer(serializers.ModelSerializer):
     # We explicitly define these to ensure they are handled as strings
     password = serializers.CharField(write_only=True)
     email = serializers.EmailField(required=True)
-    role = serializers.CharField(required=True)
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES, default=User.IS_STAFF)
 
     class Meta:
         model = User
