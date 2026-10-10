@@ -9,9 +9,8 @@
 **Frontend Application**
 https://interior-design-management-system-6ytdzrf9u.vercel.app/
 
-**Demo Credentials**
-Username: `admin`
-Password: `TemporaryPassword123!`
+**Demo access**
+Request a guided walkthrough. Administrator credentials are not published.
 
 **Backend API**
 https://interior-design-management-system.onrender.com
@@ -180,7 +179,7 @@ npm run build
 Environment variables:
 
 ```
-VITE_API_URL=<Render backend URL>
+VITE_API_URL=https://interior-design-management-system.onrender.com/api/
 ```
 
 ---
@@ -236,3 +235,13 @@ npm run dev
 ---
 
 Developed for the Interior Design Industry.
+
+
+## Permission regression checks
+
+```bash
+cd interior_management
+SECRET_KEY=test python manage.py test --settings=core.test_settings
+```
+
+Tests use isolated in-memory SQLite and do not touch the hosted database. Before promotion, remove the privileged demo bootstrap from the Render build configuration and rotate or disable existing shared administrator accounts.
