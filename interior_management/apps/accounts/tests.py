@@ -56,3 +56,14 @@ class StaffPermissionsTests(APITestCase):
         self.client.force_authenticate(self.admin)
         response = self.client.post('/api/accounts/register/', {'username': 'new', 'email': 'new@example.com', 'password': 'test-password', 'role': 'invented'}, format='json')
         self.assertEqual(response.status_code, 400)
+
+    def test_negative_financial_values_are_rejected(self):
+        for field in ['estimated_cost', 'actual_payment_received']:
+            response = self.client.patch(f'/api/jobs/{self.own_job.id}/', {field: -1}, format='json')
+            self.assertEqual(response.status_code, 400, field)
+
+    def test_staff_cannot_change_another_jobs_payment(self):
+        response = self.client.patch(f'/api/jobs/{self.other_job.id}/', {'actual_payment_received': 0}, format='json')
+        self.assertEqual(response.status_code, 404)
+        self.other_job.refresh_from_db()
+        self.assertEqual(self.other_job.actual_payment_received, 600)
