@@ -20,4 +20,7 @@ class JobViewSet(viewsets.ModelViewSet):
         return Job.objects.filter(assigned_staff=user)
 
     def perform_create(self, serializer):
-        serializer.save(assigned_staff=self.request.user)
+        if self.request.user.role == 'admin':
+            serializer.save(assigned_staff=serializer.validated_data.get('assigned_staff', self.request.user))
+        else:
+            serializer.save(assigned_staff=self.request.user)

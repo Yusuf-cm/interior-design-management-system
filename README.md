@@ -9,9 +9,8 @@
 **Frontend Application**
 https://interior-design-management-system-6ytdzrf9u.vercel.app/
 
-**Demo Credentials**
-Username: `admin`
-Password: `TemporaryPassword123!`
+**Demo access**
+Request a guided walkthrough. Administrator credentials are not published.
 
 **Backend API**
 https://interior-design-management-system.onrender.com
@@ -152,9 +151,7 @@ Environment: Python 3.13.1
 Build command:
 
 ```bash
-pip install -r requirements.txt
-python manage.py collectstatic --noinput
-python manage.py migrate
+bash build.sh
 ```
 
 Start command:
@@ -180,7 +177,7 @@ npm run build
 Environment variables:
 
 ```
-VITE_API_URL=<Render backend URL>
+VITE_API_URL=https://interior-design-management-system.onrender.com/api/
 ```
 
 ---
@@ -236,3 +233,22 @@ npm run dev
 ---
 
 Developed for the Interior Design Industry.
+
+
+## Permission regression checks
+
+```bash
+cd interior_management
+SECRET_KEY=test python manage.py test --settings=core.test_settings
+```
+
+Tests use isolated in-memory SQLite and do not touch the hosted database. Before promotion, remove the privileged demo bootstrap from the Render build configuration and rotate or disable existing shared administrator accounts.
+
+
+## Release setup prepared for Render
+
+Use root directory `interior_management` and replace the existing dashboard build command with `bash build.sh` after deploying this branch. The script installs dependencies, optionally creates the existing `studio` schema when `ADMIN_DATABASE_URL` is supplied, collects static files and runs migrations. It never creates user accounts.
+
+Removing the bootstrap does not revoke existing access. In authenticated administration, review the shared privileged accounts and disable or rotate them; do not retain a predictable public administrator password. Existing JWTs may remain usable until expiry, so verify session revocation before promoting the demo. Create restricted demo accounts with fictional records only.
+
+The customer registry now scrolls on narrow screens, reports fetch/save errors and omits the previously nonfunctional delete control. Full mobile browser verification still requires a deployed preview.
