@@ -3,7 +3,7 @@ import { Paper, TextInput, PasswordInput, Button, Title, Text, Container } from 
 import { motion } from 'framer-motion';
 import api from '../api';
 
-const Login = ({ onLoginSuccess, onToggleSignup }) => { // <--- FIXED: Added onToggleSignup here
+const Login = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,25 +19,27 @@ const Login = ({ onLoginSuccess, onToggleSignup }) => { // <--- FIXED: Added onT
       localStorage.setItem('refresh_token', res.data.refresh);
       onLoginSuccess();
     } catch (err) {
-      setError('Invalid credentials. Please try again.');
+      setError(err.response?.status === 401 ? 'The username or password is incorrect.' : 'The studio service is unavailable. Please try again shortly.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ background: '#1A1B1E', height: '100vh', display: 'flex', alignItems: 'center' }}>
-      <Container size={420}>
+    <div style={{ background: 'radial-gradient(ellipse at top left, #343b33, #161d1b 65%)', minHeight: '100svh', padding: '32px 16px', display: 'flex', alignItems: 'center' }}>
+      <Container size={460} w="100%">
+        <Text c="gray.4" size="xs" fw={600} ta="center" mb={20} style={{ letterSpacing: "0.18em" }}>THE STUDIO WORKSPACE</Text>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Paper radius="lg" p="xl" withBorder style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }}>
             <Title order={2} c="white" ta="center" style={{ fontFamily: 'Playfair Display' }}>
               STUDIO.<Text span c="yellow.5">OS</Text>
             </Title>
-            <Text c="dimmed" size="sm" ta="center" mt={5} mb={30}>Enter your credentials to manage the studio.</Text>
+            <Text c="dimmed" size="sm" ta="center" mt={5} mb={30}>A clear view of your clients, projects, and progress.</Text>
 
             <form onSubmit={handleLogin}>
               <TextInput 
                 label={<Text c="gray.5" size="xs" fw={700}>USERNAME</Text>}
+                autoComplete="username"
                 placeholder="Your username" 
                 required 
                 value={username}
@@ -46,6 +48,7 @@ const Login = ({ onLoginSuccess, onToggleSignup }) => { // <--- FIXED: Added onT
               />
               <PasswordInput 
                 label={<Text c="gray.5" size="xs" fw={700} mt="md">PASSWORD</Text>}
+                autoComplete="current-password"
                 placeholder="Your password" 
                 required 
                 mt="md" 
@@ -53,13 +56,13 @@ const Login = ({ onLoginSuccess, onToggleSignup }) => { // <--- FIXED: Added onT
                 onChange={(e) => setPassword(e.target.value)}
                 styles={{ input: { background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none' } }}
               />
-              {error && <Text color="red" size="sm" mt="sm">{error}</Text>}
+              {error && <Text role="alert" c="red.4" size="sm" mt="sm">{error}</Text>}
               <Button type="submit" fullWidth mt="xl" color="yellow" loading={loading} radius="md">
                 Sign In
               </Button>
             </form>
 
-            {/* THE CLICK HANDLER THAT WAS CRASHING */}
+            <Text c="gray.5" size="xs" ta="center" mt="xl">Access is provided by your studio administrator.</Text>
           </Paper>
         </motion.div>
       </Container>
