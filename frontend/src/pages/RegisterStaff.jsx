@@ -11,7 +11,7 @@ const RegisterStaff = ({ onToggle }) => {
     username: '',
     email: '',
     password: '',
-    role: 'staff', // Default role
+    role: 'STAFF', // Default role
     phone_number: ''
   });
   const [loading, setLoading] = useState(false);
@@ -72,7 +72,7 @@ const RegisterStaff = ({ onToggle }) => {
                 label="System Role" 
                 data={[
                   { value: 'admin', label: 'Admin (Full Access)' },
-                  { value: 'staff', label: 'Staff (Project Access)' }
+                  { value: 'STAFF', label: 'Staff (Project Access)' }
                 ]}
                 value={formData.role}
                 onChange={(val) => setFormData({...formData, role: val})}
