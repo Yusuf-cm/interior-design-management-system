@@ -13,6 +13,7 @@ const Projects = () => {
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [error, setError] = useState('');
   
   // Track if we are in "Edit" mode or "Create" mode
   const [isEditing, setIsEditing] = useState(false);
@@ -29,6 +30,7 @@ const Projects = () => {
 
   const fetchData = async () => {
     setFetching(true);
+    setError('');
     try {
       // Fetch both Jobs and Customers (Customers needed for the dropdown)
       const [jobsRes, custRes] = await Promise.all([
@@ -39,7 +41,7 @@ const Projects = () => {
       // Format customers for the Mantine Select component
       setCustomers(custRes.data.map(c => ({ value: c.id.toString(), label: c.name })));
     } catch (err) { 
-      console.error("Error fetching project data:", err); 
+      setError('Unable to load projects. Please retry.'); 
     } finally {
       setFetching(false);
     }
@@ -51,6 +53,7 @@ const Projects = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       if (isEditing) {
         // UPDATE existing record
@@ -62,7 +65,8 @@ const Projects = () => {
       setOpened(false);
       fetchData(); // Refresh the list
     } catch (err) { 
-        console.error("Submission failed:", err); 
+        const details = err.response?.data;
+        setError(details ? Object.values(details).flat().join(' ') : 'Unable to save this project. Please retry.'); 
     } finally { 
         setLoading(false); 
     }
@@ -146,7 +150,7 @@ const Projects = () => {
           </Text>
         </Table.Td>
         <Table.Td>
-          <ActionIcon variant="subtle" color="blue" onClick={() => openEditModal(project)}>
+          <ActionIcon aria-label={`Edit ${project.title}`} variant="subtle" color="blue" onClick={() => openEditModal(project)}>
             <IconPencil size={18} /> 
           </ActionIcon>
         </Table.Td>
@@ -156,6 +160,7 @@ const Projects = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      {error && !opened && <Text role="alert" c="red" mb="md">{error} <Button variant="subtle" onClick={fetchData}>Retry</Button></Text>}
       <Group justify="space-between" mb="xl">
         <Title order={2} style={{ fontFamily: 'Playfair Display' }}>Project Ledger</Title>
         <Button 
@@ -170,6 +175,7 @@ const Projects = () => {
 
       <Paper p="md" radius="lg" withBorder style={{ background: 'rgba(255,255,255,0.5)', backdropFilter: 'blur(10px)' }}>
         {projects.length > 0 ? (
+          <Table.ScrollContainer minWidth={650}>
           <Table verticalSpacing="md" highlightOnHover>
             <Table.Thead>
               <Table.Tr>
@@ -182,6 +188,7 @@ const Projects = () => {
             </Table.Thead>
             <Table.Tbody>{rows}</Table.Tbody>
           </Table>
+          </Table.ScrollContainer>
         ) : (
           <Center py={50}>
             <Stack align="center" gap="xs">
@@ -202,6 +209,7 @@ const Projects = () => {
       >
         <form onSubmit={handleSubmit}>
           <Stack>
+            {error && <Text role="alert" c="red">{error}</Text>}
             {/* Title: Permanent after creation */}
             <TextInput 
               label="Project Title" 
