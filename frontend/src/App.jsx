@@ -83,7 +83,7 @@ function App() {
       <AppShell.Header p="md" style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)' }}>
         <Group justify="space-between" h="100%">
           <Group>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger aria-label={opened ? 'Close navigation' : 'Open navigation'} opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Title order={3} style={{ fontFamily: 'Playfair Display' }}>STUDIO.<Text span c="yellow.6">OS</Text></Title>
           </Group>
           <Group visibleFrom="sm">
