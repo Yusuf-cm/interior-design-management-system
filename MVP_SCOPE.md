@@ -47,3 +47,26 @@ Studio.OS is an operations automation platform for renovation, interior-design, 
 
 ## Existing implementation status (audited October 2026)
 Django REST backend and React frontend currently include customers, staff, jobs and basic financial fields. A comprehensive renovation automation lifecycle is a roadmap, not an implemented capability. Security work is isolated on the development branch and remains untested.
+
+## Product boundary: assistant, not operator
+Studio.OS is a lightweight administrative assistant for small interior-design companies. It does not enter contracts, hire or pay contractors, guarantee estimates, process or hold funds, or send external messages without explicit owner approval. No paid third-party integrations are required for the initial product.
+
+## First target customer
+An owner-led interior-design studio with 2–10 people coordinating clients and active projects through WhatsApp, spreadsheets and notes. Validate this profile through customer interviews rather than assuming it represents the market.
+
+## Experience principle
+The home screen answers: (1) What needs my attention today? (2) Which client is waiting for me? (3) What should my team do next? The system should minimize data entry, re-use existing records, and prepare actions for human review.
+
+## First vertical slice
+- Create a lead with customer, brief and next action.
+- Schedule a consultation and record survey notes.
+- Draft an itemized quote and review it before sharing.
+- Convert an accepted quote into a project without retyping.
+- View a daily action list and prepare a customer status update.
+- Close out the project and schedule a voluntary follow-up.
+
+## Success measures for pilot
+Time to record an inquiry; time to produce a first quote; number of duplicate entries avoided; overdue follow-ups; owner time spent on daily administration; and whether the owner elects to keep using the product after a trial. Measure baseline and trial rather than inventing savings.
+
+## Competitive alternatives to test
+Houzz Pro, Mydoma Studio, DesignFiles, Indema, Buildertrend, plus actual local substitutes (WhatsApp, Excel, notebooks). Focus comparison on onboarding effort, core workflow, price, mobile usability, and administrative time saved.
