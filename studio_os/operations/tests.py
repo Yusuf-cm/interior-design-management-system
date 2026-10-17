@@ -44,3 +44,39 @@ class TenantIsolationTests(TestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get("/api/leads/", HTTP_X_ORGANIZATION_ID=str(self.org_a.id))
         self.assertIn(response.status_code, [401, 403])
+
+
+
+class CustomerWorkflowTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.owner = User.objects.create_user("studio-owner", password="test-only")
+        self.field = User.objects.create_user("field-worker", password="test-only")
+        self.org = Organization.objects.create(name="Nuru Interiors")
+        self.other = Organization.objects.create(name="Other Studio")
+        Membership.objects.create(user=self.owner, organization=self.org, role=Membership.Role.OWNER)
+        Membership.objects.create(user=self.field, organization=self.org, role=Membership.Role.FIELD)
+        Customer.objects.create(organization=self.other, name="Private Other Client")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.owner)
+        self.headers = {"HTTP_X_ORGANIZATION_ID": str(self.org.id)}
+
+    def test_owner_can_create_customer_without_supplying_tenant(self):
+        response = self.client.post("/api/customers/", {"name": "Amina", "phone": "+254700000000"}, format="json", **self.headers)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Customer.objects.get(name="Amina").organization, self.org)
+
+    def test_customer_list_excludes_other_company(self):
+        response = self.client.get("/api/customers/", **self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [])
+
+    def test_field_staff_cannot_create_customer(self):
+        self.client.force_authenticate(user=self.field)
+        response = self.client.post("/api/customers/", {"name": "Unauthorized"}, format="json", **self.headers)
+        self.assertEqual(response.status_code, 403)
+
+    def test_client_cannot_override_organization(self):
+        response = self.client.post("/api/customers/", {"name": "Amina", "organization": self.other.id}, format="json", **self.headers)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Customer.objects.get(name="Amina").organization, self.org)
