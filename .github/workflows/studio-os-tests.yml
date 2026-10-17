@@ -1,0 +1,31 @@
+name: Studio.OS isolated tests
+on:
+  push:
+    branches:
+      - security/prelaunch-hardening-20261017
+    paths:
+      - 'studio_os/**'
+      - '.github/workflows/studio-os-tests.yml'
+  pull_request:
+    paths:
+      - 'studio_os/**'
+      - '.github/workflows/studio-os-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated dependencies
+        run: python -m pip install -r studio_os/requirements.txt
+      - name: Check Django system configuration
+        run: python -m studio_os.manage check
+      - name: Verify migration files match models
+        run: python -m studio_os.manage makemigrations --check --dry-run
+      - name: Run domain policy tests
+        run: python -m unittest discover -s studio_os/tests -v
+      - name: Run Django integration tests
+        run: python -m studio_os.manage test studio_os.operations -v 2
