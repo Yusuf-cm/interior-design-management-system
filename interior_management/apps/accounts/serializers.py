@@ -5,6 +5,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'role', 'phone_number', 'first_name', 'last_name']
+        read_only_fields = ['id', 'username', 'role']
 
 class RegisterSerializer(serializers.ModelSerializer):
     # We explicitly define these to ensure they are handled as strings
