@@ -69,3 +69,27 @@ class DailyQueueView(ListAPIView):
         if membership.role == Membership.Role.FIELD:
             qs = qs.filter(assignee=self.request.user)
         return qs.order_by("due_at", "created_at")
+
+
+
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ["id", "name", "email", "phone", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+
+class CustomerListCreateView(ListCreateAPIView):
+    """Tenant-scoped customer directory; company ownership is never client-supplied."""
+    serializer_class = CustomerSerializer
+
+    def get_queryset(self):
+        org, _ = organization_for(self.request)
+        return Customer.objects.filter(organization=org).order_by("-created_at")
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        org, membership = organization_for(self.request)
+        if membership.role == Membership.Role.FIELD:
+            raise PermissionDenied("Field staff cannot create customers")
+        serializer.save(organization=org)
