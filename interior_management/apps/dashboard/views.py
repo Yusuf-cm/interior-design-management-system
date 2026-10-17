@@ -11,10 +11,12 @@ class DashboardSummaryView(APIView):
 
     def get(self, request):
         # 1. Customer Metrics
-        total_customers = Customer.objects.count()
+        visible_customers = Customer.objects.all() if request.user.role == 'admin' else Customer.objects.filter(created_by=request.user)
+        visible_jobs = Job.objects.all() if request.user.role == 'admin' else Job.objects.filter(assigned_staff=request.user)
+        total_customers = visible_customers.count()
         
         # 2. Job Metrics using Aggregation
-        job_stats = Job.objects.aggregate(
+        job_stats = visible_jobs.aggregate(
             total_jobs=Count('id'),
             active_jobs=Count('id', filter=models.Q(status='ACTIVE')),
             completed_jobs=Count('id', filter=models.Q(status='COMPLETED')),
@@ -28,7 +30,7 @@ class DashboardSummaryView(APIView):
         pending_revenue = estimated_revenue - actual_revenue
 
         # 4. Recent Activity (Corrected order_by)
-        recent_jobs = Job.objects.select_related('customer').order_by('-created_at')[:5]
+        recent_jobs = visible_jobs.select_related('customer').order_by('-created_at')[:5]
         recent_jobs_data = [
             {
                 "id": job.id,
