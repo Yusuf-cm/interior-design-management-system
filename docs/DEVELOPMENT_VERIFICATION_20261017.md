@@ -37,3 +37,19 @@ This is an API development slice, not a finished interface or production launch.
 No authentication/login UI, lead-stage mutation, consultation booking, reassignment UI,
 communications delivery, quotation acceptance or project conversion is added here.
 Workflow completion records the action outcome; it does not invent a lead-stage change.
+
+## Inquiry progression and planning follow-up
+- 35 backend integration tests and 11 pure domain tests pass.
+- Added early-stage transitions with mandatory notes and version checks; downstream
+  consultation/quote stages remain gated behind future evidence-bearing workflows.
+- LOST cancels open actions; DORMANT permits later contact and retains follow-ups.
+- Added explicit action creation, active same-company assignment and audited rescheduling.
+- Read responses expose versions; completion now requires expected_version on first use.
+  Stale completion after rescheduling returns 409 instead of completing changed work.
+- Overdue dated work sorts before undated work.
+- Follow-up creation rejects inactive assignees and rolls back completion.
+- Migration 0002 adds version fields and cancellation flag. A disposable SQLite migration
+  rehearsal seeded 0001 records and verified fields, ownership and completion history
+  survive 0001 -> 0002 -> 0001 -> 0002. Reversing necessarily removes version/cancellation
+  metadata; this is not a rollback prescription for production data.
+- Detailed API contract: studio_os/API_WORKFLOW.md.

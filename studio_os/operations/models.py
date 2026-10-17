@@ -1,7 +1,5 @@
-import uuid
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
 
 
 class Organization(models.Model):
@@ -50,6 +48,7 @@ class Lead(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="leads")
     brief = models.TextField(blank=True)
     status = models.CharField(max_length=24, choices=Status.choices, default=Status.NEW)
+    version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -69,4 +68,7 @@ class NextAction(models.Model):
     title = models.CharField(max_length=180)
     due_at = models.DateTimeField(null=True, blank=True)
     done = models.BooleanField(default=False)
+    cancelled = models.BooleanField(default=False)
+    version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
+
