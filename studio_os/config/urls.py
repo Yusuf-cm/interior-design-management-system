@@ -1,9 +1,13 @@
-rrom django.urls import path
-rrom studio_os.operations.views import DailyQueueView, LeadListCreateView
+from django.urls import path
+from studio_os.operations.views import (
+    CustomerListCreateView, DailyQueueView, LeadListCreateView,
+    LeadDetailView, ActionCompleteView,
+)
 
 urlpatterns = [
-    path("api/leads/", LeadListCreateView.as_view(), name="lead-list-create"),
-    path("api/today/", DailyQueueView.as_view(), name="daily-queue"),
+    path("api/customers/", CustomerListCreateView.as_view()),
+    path("api/leads/", LeadListCreateView.as_view()),
+    path("api/leads/<int:pk>/", LeadDetailView.as_view()),
+    path("api/today/", DailyQueueView.as_view()),
+    path("api/actions/<int:pk>/complete/", ActionCompleteView.as_view()),
 ]
-
-urlpatterns += [path("api/customers/", CustomerListCreateView.as_view(), name="customer-list-create")]
