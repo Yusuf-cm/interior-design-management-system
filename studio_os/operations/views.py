@@ -7,7 +7,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 from rest_framework.generics import ListCreateAPIView, ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Activity, Customer, Lead, Membership, NextAction
+from .models import Activity, Consultation, Customer, Lead, Membership, NextAction
 from studio_os.domain.policies import DomainError, LeadStatus, transition_lead
 
 
@@ -62,7 +62,7 @@ class ActionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NextAction
-        fields = ["id", "lead", "customer_name", "title", "due_at", "done", "cancelled", "assignee", "version"]
+        fields = ["id", "lead", "customer_name", "title", "due_at", "done", "cancelled", "assignee", "version", "consultation"]
 
 
 class DailyQueueView(ListAPIView):
@@ -113,8 +113,10 @@ class LeadDetailView(APIView):
         if membership.role == Membership.Role.FIELD:
             raise PermissionDenied("Inquiry details unavailable")
         lead = get_object_or_404(Lead, pk=pk, organization=org)
+        from .consultations import ConsultationSerializer
         return Response({
             **LeadSerializer(lead).data,
+            "consultations": ConsultationSerializer(lead.consultations.filter(organization=org), many=True).data,
             "actions": ActionSerializer(lead.actions.filter(organization=org), many=True).data,
             "activities": list(Activity.objects.filter(organization=org, lead=lead)
                                .order_by("created_at").values("id", "kind", "details", "created_at")),
@@ -143,6 +145,8 @@ class ActionCompleteView(APIView):
         if membership.role == Membership.Role.FIELD:
             actions = actions.filter(assignee=request.user)
         action = lock_action(actions, pk, org)
+        if action.consultation_id:
+            raise Conflict("Record the visit outcome through the consultation workflow")
         # Repeated completion is harmless and never creates duplicate follow-ups.
         if action.done:
             return Response(ActionSerializer(action).data)
@@ -228,14 +232,20 @@ class LeadTransitionView(APIView):
             raise ValidationError({"status": str(exc)})
         update_versioned(lead, data["expected_version"], status=target.value)
         cancelled = 0
+        cancelled_visits = 0
         if lead.status == Lead.Status.LOST:
             cancelled = lead.actions.filter(organization=org, done=False, cancelled=False).update(
                 cancelled=True, version=F("version") + 1,
             )
+            cancelled_visits = lead.consultations.filter(
+                organization=org, status__in=[
+                    Consultation.Status.PROPOSED, Consultation.Status.CONFIRMED, Consultation.Status.RESCHEDULED,
+                ],
+            ).update(status=Consultation.Status.CANCELLED, version=F("version") + 1)
         Activity.objects.create(
             organization=org, actor=request.user, lead=lead, kind="LEAD_STATUS_CHANGED",
             details={"before": previous, "after": lead.status, "note": data["note"],
-                     "cancelled_actions": cancelled},
+                     "cancelled_actions": cancelled, "cancelled_consultations": cancelled_visits},
         )
         return Response(LeadSerializer(lead).data)
 
@@ -292,6 +302,8 @@ class ActionUpdateView(APIView):
         if membership.role not in {Membership.Role.OWNER, Membership.Role.COORDINATOR}:
             raise PermissionDenied("Only owners and coordinators can change planned actions")
         action = lock_action(NextAction.objects.filter(organization=org), pk, org)
+        if action.consultation_id:
+            raise Conflict("Change visit details through the consultation workflow")
         if action.done or action.cancelled:
             raise Conflict("Completed or cancelled actions cannot be rescheduled")
         serializer = ActionUpdateSerializer(

@@ -62,6 +62,8 @@ class Activity(models.Model):
 
 
 class NextAction(models.Model):
+    consultation = models.OneToOneField("Consultation", null=True, blank=True,
+                                      on_delete=models.PROTECT, related_name="visit_action")
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
     lead = models.ForeignKey(Lead, on_delete=models.PROTECT, related_name="actions")
     assignee = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
@@ -72,3 +74,30 @@ class NextAction(models.Model):
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+class Consultation(models.Model):
+    class Status(models.TextChoices):
+        PROPOSED = "PROPOSED"
+        CONFIRMED = "CONFIRMED"
+        RESCHEDULED = "RESCHEDULED"
+        COMPLETED = "COMPLETED"
+        CANCELLED = "CANCELLED"
+        NO_SHOW = "NO_SHOW"
+
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    lead = models.ForeignKey(Lead, on_delete=models.PROTECT, related_name="consultations")
+    assignee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    location = models.CharField(max_length=300)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PROPOSED)
+    outcome = models.TextField(blank=True)
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(ends_at__gt=models.F("starts_at")),
+                                   name="consultation_positive_duration"),
+        ]
+        indexes = [models.Index(fields=["organization", "assignee", "status", "starts_at"])]

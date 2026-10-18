@@ -4,7 +4,14 @@ from studio_os.operations.views import (
     LeadDetailView, ActionCompleteView, LeadTransitionView, ActionCreateView, ActionUpdateView,
 )
 
+from studio_os.operations.consultations import (
+    ConsultationListView, ConsultationCreateView, ConsultationCommandView,
+)
+
 urlpatterns = [
+    path('api/consultations/', ConsultationListView.as_view()),
+    path('api/leads/<int:pk>/consultations/', ConsultationCreateView.as_view()),
+    path('api/consultations/<int:pk>/command/', ConsultationCommandView.as_view()),
     path("api/customers/", CustomerListCreateView.as_view()),
     path("api/leads/", LeadListCreateView.as_view()),
     path("api/leads/<int:pk>/", LeadDetailView.as_view()),

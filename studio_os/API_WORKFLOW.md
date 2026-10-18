@@ -70,3 +70,58 @@ cross-company detail/action IDs return 404. Cancellation and closed-action chang
 Changes record the authenticated actor and note. Action edits retain before/after snapshots.
 Row locks use a consistent lead-first order where supported; parallel-request behavior
 on PostgreSQL has not been tested. SQLite verification covers sequential stale edits.
+
+## Consultation scheduling
+| Method | Route | Behavior |
+| --- | --- | --- |
+| GET | /api/consultations/ | Office staff list company visits; field staff see assigned visits |
+| POST | /api/leads/{id}/consultations/ | Propose a site visit for qualified/booked inquiry |
+| POST | /api/consultations/{id}/command/ | Confirm, reschedule, cancel, complete or record no-show |
+
+Create proposal:
+```json
+{"starts_at": "2026-10-22T10:00:00+03:00", "ends_at": "2026-10-22T11:00:00+03:00",
+ "location": "Customer site", "assignee": 4}
+```
+Dates must be in the future, with end after start. Assignee must be an active user with
+active membership in the company. Owners/coordinators can assign colleagues; designers
+can propose visits for themselves.
+
+Proposals do not reserve time or advance the inquiry.
+Confirm with:
+```json
+{"expected_version": 1, "command": "confirm", "note": "Staff and customer agreed to this visit"}
+```
+Confirmation blocks overlaps with that assignee's confirmed visits in the selected company.
+The interval uses start-inclusive/end-exclusive boundaries, so adjacent visits are allowed.
+Conflict errors contain no other customer's details. Availability is company-scoped;
+this does not inspect other companies or an external calendar.
+
+Confirmation changes QUALIFIED to CONSULTATION_BOOKED and creates one linked visit action.
+Generic action completion/rescheduling endpoints reject linked visit actions, which must
+be managed through this workflow.
+
+Reschedule requires all four scheduling fields plus expected_version, command=reschedule
+and a nonblank note. It records the old/new plan, releases the old confirmed slot, and
+cancels the visit action until re-confirmation. Re-confirmation checks availability again.
+Only PROPOSED/RESCHEDULED visits can be confirmed.
+
+Cancel requires expected_version, command=cancel and note. Proposed, confirmed and
+rescheduled visits may be cancelled. The action is cancelled and an internal review
+follow-up is created.
+
+Complete/no_show require a confirmed visit, its current expected_version and nonblank
+note. Outcomes cannot be recorded before the start time. Assigned field staff can record
+outcomes; only office staff can schedule, confirm, cancel or reschedule.
+Completion stores outcome notes, completes the visit action and adds an assessment
+preparation action. No-show cancels the visit action and creates a missed-visit follow-up.
+Terminal commands reject retries with 409 and do not duplicate follow-ups.
+
+Completing a visit does not mark an inquiry ASSESSED. CONSULTATION_BOOKED denotes the
+inquiry stage reached; cancelling/no-show does not erase this historical stage. A
+replacement visit can be proposed. Losing an inquiry cancels all nonterminal visits
+and open actions in the same transaction, without erasing completed visit history.
+
+Visit history appears in inquiry detail. Scheduling changes record actor, reason and
+before/after snapshots. Row locking serializes confirmations per staff membership on
+databases supporting it; concurrent PostgreSQL requests have not been tested locally.
