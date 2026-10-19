@@ -7,7 +7,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 from rest_framework.generics import ListCreateAPIView, ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Activity, Consultation, Customer, Lead, Membership, NextAction
+from .models import Activity, Consultation, Customer, Lead, Membership, NextAction, Quote
 from studio_os.domain.policies import DomainError, LeadStatus, transition_lead
 
 
@@ -62,7 +62,7 @@ class ActionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NextAction
-        fields = ["id", "lead", "customer_name", "title", "due_at", "done", "cancelled", "assignee", "version", "consultation"]
+        fields = ["id", "lead", "customer_name", "title", "due_at", "done", "cancelled", "assignee", "version", "consultation", "origin_key"]
 
 
 class DailyQueueView(ListAPIView):
@@ -114,8 +114,16 @@ class LeadDetailView(APIView):
             raise PermissionDenied("Inquiry details unavailable")
         lead = get_object_or_404(Lead, pk=pk, organization=org)
         from .consultations import ConsultationSerializer
+        from .assessments import AssessmentSerializer
+        from .quotes import QuoteSerializer
+        from .models import Assessment, Quote
         return Response({
             **LeadSerializer(lead).data,
+            "assessments": AssessmentSerializer(Assessment.objects.filter(
+                organization=org, consultation__lead=lead), many=True).data,
+            "quotes": QuoteSerializer(Quote.objects.filter(
+                organization=org, assessment__consultation__lead=lead).select_related(
+                    "assessment", "current_revision"), many=True).data,
             "consultations": ConsultationSerializer(lead.consultations.filter(organization=org), many=True).data,
             "actions": ActionSerializer(lead.actions.filter(organization=org), many=True).data,
             "activities": list(Activity.objects.filter(organization=org, lead=lead)
@@ -145,8 +153,8 @@ class ActionCompleteView(APIView):
         if membership.role == Membership.Role.FIELD:
             actions = actions.filter(assignee=request.user)
         action = lock_action(actions, pk, org)
-        if action.consultation_id:
-            raise Conflict("Record the visit outcome through the consultation workflow")
+        if action.consultation_id or action.origin_key:
+            raise Conflict("Complete this action through its source workflow")
         # Repeated completion is harmless and never creates duplicate follow-ups.
         if action.done:
             return Response(ActionSerializer(action).data)
@@ -233,6 +241,7 @@ class LeadTransitionView(APIView):
         update_versioned(lead, data["expected_version"], status=target.value)
         cancelled = 0
         cancelled_visits = 0
+        revoked_quotes = []
         if lead.status == Lead.Status.LOST:
             cancelled = lead.actions.filter(organization=org, done=False, cancelled=False).update(
                 cancelled=True, version=F("version") + 1,
@@ -242,10 +251,17 @@ class LeadTransitionView(APIView):
                     Consultation.Status.PROPOSED, Consultation.Status.CONFIRMED, Consultation.Status.RESCHEDULED,
                 ],
             ).update(status=Consultation.Status.CANCELLED, version=F("version") + 1)
+            quotes = Quote.objects.filter(
+                organization=org, assessment__consultation__lead=lead,
+                status__in=[Quote.Status.REVIEW, Quote.Status.APPROVED],
+            )
+            revoked_quotes = list(quotes.values_list("pk", flat=True))
+            quotes.update(status=Quote.Status.DRAFT, version=F("version") + 1)
         Activity.objects.create(
             organization=org, actor=request.user, lead=lead, kind="LEAD_STATUS_CHANGED",
             details={"before": previous, "after": lead.status, "note": data["note"],
-                     "cancelled_actions": cancelled, "cancelled_consultations": cancelled_visits},
+                     "cancelled_actions": cancelled, "cancelled_consultations": cancelled_visits,
+                     "revoked_quote_ids": revoked_quotes},
         )
         return Response(LeadSerializer(lead).data)
 

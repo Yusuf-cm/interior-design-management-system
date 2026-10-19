@@ -7,6 +7,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import Activity, Consultation, Lead, Membership, NextAction
+from .workflow_tasks import plan_task
 from .views import Conflict, organization_for, require_office_member, update_versioned
 
 
@@ -184,10 +185,13 @@ class ConsultationCommandView(APIView):
         update_versioned(visit, data["expected_version"], **changes)
         sync_action(visit)
         if command in {"complete", "no_show", "cancel"}:
-            NextAction.objects.create(
-                organization=org, lead=lead, assignee=request.user, due_at=timezone.now(),
-                title={"complete": "Prepare visit assessment", "no_show": "Follow up on missed consultation",
-                       "cancel": "Review cancelled consultation"}[command],
-            )
+            if command == "complete":
+                plan_task(org, lead, f"visit:{visit.pk}:assessment", "Prepare visit assessment", request.user)
+            else:
+                NextAction.objects.create(
+                    organization=org, lead=lead, assignee=request.user, due_at=timezone.now(),
+                    title={"no_show": "Follow up on missed consultation",
+                           "cancel": "Review cancelled consultation"}[command],
+                )
         audit(request, visit, command, data["note"], before)
         return Response(ConsultationSerializer(visit).data)

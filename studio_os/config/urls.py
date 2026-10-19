@@ -8,7 +8,21 @@ from studio_os.operations.consultations import (
     ConsultationListView, ConsultationCreateView, ConsultationCommandView,
 )
 
+from studio_os.operations.assessments import (
+    AssessmentCreateView, AssessmentDetailView, AssessmentCommandView,
+)
+from studio_os.operations.quotes import (
+    QuoteCreateView, QuoteDetailView, QuoteRevisionView, QuoteReviewView,
+)
+
 urlpatterns = [
+    path("api/consultations/<int:pk>/assessment/", AssessmentCreateView.as_view()),
+    path("api/assessments/<int:pk>/", AssessmentDetailView.as_view()),
+    path("api/assessments/<int:pk>/command/", AssessmentCommandView.as_view()),
+    path("api/assessments/<int:pk>/quote/", QuoteCreateView.as_view()),
+    path("api/quotes/<int:pk>/", QuoteDetailView.as_view()),
+    path("api/quotes/<int:pk>/revisions/", QuoteRevisionView.as_view()),
+    path("api/quotes/<int:pk>/review/", QuoteReviewView.as_view()),
     path('api/consultations/', ConsultationListView.as_view()),
     path('api/leads/<int:pk>/consultations/', ConsultationCreateView.as_view()),
     path('api/consultations/<int:pk>/command/', ConsultationCommandView.as_view()),

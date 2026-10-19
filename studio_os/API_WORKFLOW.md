@@ -125,3 +125,107 @@ and open actions in the same transaction, without erasing completed visit histor
 Visit history appears in inquiry detail. Scheduling changes record actor, reason and
 before/after snapshots. Row locking serializes confirmations per staff membership on
 databases supporting it; concurrent PostgreSQL requests have not been tested locally.
+
+## Site assessment and internal quotation drafting
+
+| Method | Route | Behavior |
+| --- | --- | --- |
+| POST | /api/consultations/{id}/assessment/ | Record one assessment for a completed visit |
+| GET/PATCH | /api/assessments/{id}/ | Read or edit draft/reopened observations |
+| POST | /api/assessments/{id}/command/ | Mark ready or reopen for correction |
+| POST | /api/assessments/{id}/quote/ | Create first internal quotation revision |
+| GET | /api/quotes/{id}/ | Read current draft and revision history |
+| POST | /api/quotes/{id}/revisions/ | Append a new revision and revoke prior approval |
+| POST | /api/quotes/{id}/review/ | Submit, approve sharing internally, or return to draft |
+
+Only active office memberships can use these routes. Field staff cannot read quotation
+amounts, assessments or internal review records. Company ownership is derived from the
+header and membership; unavailable cross-company IDs return 404. Closed inquiries reject
+mutations but retain history.
+
+### Assessment content
+POST assessment:
+```json
+{"scope": "Paint living room walls",
+ "notes": "Protect existing flooring",
+ "measurements": [
+   {"label": "Living room length", "value": "4.200", "unit": "m", "required": true},
+   {"label": "Living room width", "value": null, "unit": "m", "required": true}
+ ]}
+```
+A null measurement is explicitly unknown. Labels must be distinct. Values are positive
+decimals with up to three places. Units: mm, cm, m, m2, count. At most 100 entries.
+Scope/notes can be incomplete in a draft. PATCH accepts scope, notes and/or the full
+measurement list, and requires expected_version plus a nonblank note.
+
+POST command:
+```json
+{"expected_version": 1, "command": "ready", "note": "Checked site observations"}
+```
+Readiness requires a nonblank scope, at least one required measurement, and values for
+all required measurements. Responses include missing_information rather than inventing
+dimensions. Only an owner may supply provisional_reason to authorize a preliminary estimate
+despite missing measurements; scope itself cannot be omitted. The exception remains visible
+and is copied into quotation snapshots. There is no assumed measurement checklist:
+the studio must explicitly identify the measurements required for this job.
+
+Ready assessments cannot be edited. Use command=reopen with current version/note, then
+PATCH and mark ready again. Reopening clears the exception, revokes review/approval of
+the related quotation and requires a fresh revision before resubmission. Lead ASSESSED
+records the stage reached; current readiness is always checked on the assessment itself.
+
+### Quotation draft and revisions
+POST first draft:
+```json
+{"expected_assessment_version": 2,
+ "items": [{"description": "Paint", "quantity": "2.000", "unit_price": "1000.00"},
+           {"description": "Labour", "quantity": "1.000", "unit_price": "500.00"}],
+ "discount": "100.00", "tax_rate": "0.160000"}
+```
+The tax rate above is only an arithmetic example, not a configured tax rule.
+Discount and rate default to zero. Currency is copied from the organization and retained
+by all revisions of that quotation. Client-supplied totals/currency/status/organization
+cannot override server calculations and ownership.
+
+Each line amount rounds quantity × unit price to two places using ROUND_HALF_UP.
+Subtotal is the sum of rounded line amounts. Tax is rounded after subtracting the discount.
+Total = subtotal - discount + tax. Discount cannot exceed subtotal; rate must be 0–1.
+One to 100 lines; positive quantities, nonnegative prices. Decimal precision/size limits
+are validated. All response monetary values are decimal strings.
+
+One quotation exists per assessment. A second create request returns 409. POST revisions
+uses the same calculation payload plus expected_version for the quotation and a note.
+Every revision snapshots scope, notes, measurements, exception, currency and totals.
+Old revisions remain unchanged. Model instance saves reject updates to existing revisions;
+the API exposes no revision mutation/delete route. This is application-level immutability,
+not a database trigger against arbitrary direct SQL writes.
+
+A quotation's source_current flag reports whether its current revision matches the
+current ready assessment. A source version mismatch prevents submission and approval.
+New revisions always return the quotation to DRAFT and require review again.
+
+### Internal review
+POST review:
+```json
+{"expected_version": 1, "command": "submit", "note": "Ready for owner review"}
+```
+submit moves DRAFT to READY_FOR_REVIEW and queues one task for an active owner.
+approve requires an owner, a current assessment snapshot, a current quotation version
+and READY_FOR_REVIEW status. It sets APPROVED_TO_SHARE and completes the review task.
+return_to_draft withdraws a pending/approved draft and cancels its pending review task.
+Retries with stale versions return 409 without duplicate reviews or revisions.
+
+Approval is an internal record only. No sending, acceptance, signature, payment or project
+conversion endpoint exists. An approved draft does not mark an inquiry QUOTED or WON.
+
+### Workflow tasks
+New assessment-preparation, estimate-preparation, recheck and owner-review tasks have
+server-generated origin_key values unique within their company. Their source workflows
+settle/reuse them instead of duplicating reminders. Generic action completion rejects
+these tasks, preventing manual completion from bypassing assessment/review requirements.
+Existing tasks without a reliable origin remain unchanged during migration; they are
+not guessed or matched by title.
+
+Reopening a source revokes quotation approval with an explicit audit event. Losing an
+inquiry revokes pending/approved quotations, cancels open tasks and records affected
+quotation IDs in its stage-change audit.

@@ -26,7 +26,9 @@ class ConsultationMigrationTests(TransactionTestCase):
             organization_id=org.pk, lead_id=lead.pk, title="Existing task", done=True, version=4)
         executor = MigrationExecutor(connection)
         executor.migrate(self.new_target)
-        from .models import Lead, NextAction
+        upgraded_apps = executor.loader.project_state(self.new_target).apps
+        Lead = upgraded_apps.get_model("operations", "Lead")
+        NextAction = upgraded_apps.get_model("operations", "NextAction")
         saved = NextAction.objects.get(pk=action.pk)
         self.assertIsNone(saved.consultation_id)
         self.assertTrue(saved.done)
