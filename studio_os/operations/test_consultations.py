@@ -227,3 +227,26 @@ class ConsultationWorkflowTests(TestCase):
         self.command(visit, "confirm")
         self.assertEqual(self.command(visit, "confirm").status_code, 409)
         self.assertEqual(NextAction.objects.filter(consultation_id=visit).count(), 1)
+
+    def test_field_completion_queues_assessment_for_office_not_field_staff(self):
+        from django.contrib.auth import get_user_model
+        office = get_user_model().objects.create_user("office-designer")
+        Membership.objects.create(user=office, organization=self.org_a, role=Membership.Role.DESIGNER)
+        visit = self.propose().json()["id"]
+        self.command(visit, "confirm")
+        Membership.objects.filter(user=self.a).update(role=Membership.Role.FIELD)
+        with patch("studio_os.operations.consultations.timezone.now", return_value=self.start+timedelta(hours=2)):
+            self.assertEqual(self.command(visit, "complete", version=2).status_code, 200)
+        task = NextAction.objects.get(origin_key=f"visit:{visit}:assessment")
+        self.assertEqual(task.assignee, office)
+
+    def test_designer_cannot_take_over_another_staff_members_visit(self):
+        from django.contrib.auth import get_user_model
+        designer = get_user_model().objects.create_user("other-designer")
+        Membership.objects.create(user=designer, organization=self.org_a, role=Membership.Role.DESIGNER)
+        visit = self.propose().json()["id"]
+        self.client.force_authenticate(user=designer)
+        response = self.command(visit, "reschedule", starts_at=(self.start+timedelta(days=1)).isoformat(),
+            ends_at=(self.start+timedelta(days=1,hours=1)).isoformat(), location="Other site", assignee=designer.pk)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Consultation.objects.get(pk=visit).assignee_id, self.a.pk)

@@ -29,3 +29,11 @@ jobs:
         run: python -m unittest discover -s studio_os/tests -v
       - name: Run Django integration tests
         run: python -m studio_os.manage test studio_os.operations -v 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install workspace test dependencies
+        run: npm ci --prefix studio_os/ui-tests --ignore-scripts --no-audit --no-fund
+      - name: Run workspace DOM and utility tests
+        run: npm test --prefix studio_os/ui-tests

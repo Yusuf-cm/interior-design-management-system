@@ -20,3 +20,9 @@ python -m unittest discover -s studio_os/tests -v
 
 Only the isolated SQLite database is configured. See
 [API_WORKFLOW.md](API_WORKFLOW.md) for the current API contract.
+
+## Connected workspace
+A local interface now covers today's actions, customers, inquiries, site visits,
+assessments and internal quotation review. See [WORKSPACE_GUIDE.md](WORKSPACE_GUIDE.md)
+for account setup, launch commands and the walkthrough. The tutorial frontend is not used.
+No Node build is required to run the interface.

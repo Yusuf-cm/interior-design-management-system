@@ -1,0 +1,26 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Studio.OS — Work, in order.</title>
+  <link rel="stylesheet" href="{% static 'studio_os/workspace.css' %}">
+  <script type="module" src="{% static 'studio_os/workspace.mjs' %}"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to work</a>
+  <div id="app" aria-busy="true"><p class="boot">Opening your workspace…</p></div>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <dialog id="modal" aria-labelledby="modal-title">
+    <form id="editor">
+      <div class="modal-head"><div><p class="eyebrow" id="modal-context">STUDIO WORKSPACE</p><h2 id="modal-title"></h2></div><button type="button" class="icon" data-close aria-label="Close dialog">×</button></div>
+      <div id="modal-body"></div>
+      <div id="form-error" class="form-error" role="alert" hidden></div>
+      <footer class="modal-footer"><button type="button" class="quiet" data-close>Cancel</button><button type="submit" class="primary" id="submit-button">Save</button></footer>
+    </form>
+  </dialog>
+  <noscript>This workspace needs JavaScript to load your company's records.</noscript>
+</body>
+</html>

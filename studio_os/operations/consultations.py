@@ -152,6 +152,10 @@ class ConsultationCommandView(APIView):
             raise Conflict("This visit already has a final outcome")
         changes = {}
         if command == "reschedule":
+            if visit.assignee_id != request.user.pk and membership.role not in {
+                Membership.Role.OWNER, Membership.Role.COORDINATOR,
+            }:
+                raise PermissionDenied("Only owners and coordinators can reassign another staff member's visit")
             scheduling = ScheduleSerializer(data={key: data[key] for key in
                 ("starts_at", "ends_at", "location", "assignee") if key in data})
             scheduling.is_valid(raise_exception=True)
@@ -186,7 +190,13 @@ class ConsultationCommandView(APIView):
         sync_action(visit)
         if command in {"complete", "no_show", "cancel"}:
             if command == "complete":
-                plan_task(org, lead, f"visit:{visit.pk}:assessment", "Prepare visit assessment", request.user)
+                preparer = request.user
+                if membership.role == Membership.Role.FIELD:
+                    office_member = Membership.objects.filter(
+                        organization=org, active=True, user__is_active=True,
+                    ).exclude(role=Membership.Role.FIELD).select_related("user").order_by("pk").first()
+                    preparer = office_member.user if office_member else None
+                plan_task(org, lead, f"visit:{visit.pk}:assessment", "Prepare visit assessment", preparer)
             else:
                 NextAction.objects.create(
                     organization=org, lead=lead, assignee=request.user, due_at=timezone.now(),

@@ -15,3 +15,6 @@ dist/
 **/.env
 **/.env.local
 
+# Isolated Studio.OS local data
+studio_os/dev.sqlite3
+studio_os/dev.sqlite3-*

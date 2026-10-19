@@ -15,7 +15,14 @@ from studio_os.operations.quotes import (
     QuoteCreateView, QuoteDetailView, QuoteRevisionView, QuoteReviewView,
 )
 
+from studio_os.operations.workspace import workspace, session, sign_in, sign_out, StaffDirectoryView
+
 urlpatterns = [
+    path("", workspace, name="studio-workspace"),
+    path("api/session/", session),
+    path("api/session/login/", sign_in),
+    path("api/session/logout/", sign_out),
+    path("api/staff/", StaffDirectoryView.as_view()),
     path("api/consultations/<int:pk>/assessment/", AssessmentCreateView.as_view()),
     path("api/assessments/<int:pk>/", AssessmentDetailView.as_view()),
     path("api/assessments/<int:pk>/command/", AssessmentCommandView.as_view()),

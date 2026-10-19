@@ -8,11 +8,12 @@ DEBUG = os.environ.get("STUDIO_OS_DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 INSTALLED_APPS = [
     "django.contrib.auth", "django.contrib.contenttypes",
-    "django.contrib.sessions", "rest_framework", "studio_os.operations",
+    "django.contrib.sessions", "django.contrib.staticfiles", "rest_framework", "studio_os.operations",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
 ]
@@ -27,3 +28,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
 }
 
+
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "APP_DIRS": True,
+    "OPTIONS": {"context_processors": ["django.template.context_processors.request"]},
+}]
+STATIC_URL = "/static/"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"

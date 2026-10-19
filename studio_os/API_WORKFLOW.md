@@ -229,3 +229,22 @@ not guessed or matched by title.
 Reopening a source revokes quotation approval with an explicit audit event. Losing an
 inquiry revokes pending/approved quotations, cancels open tasks and records affected
 quotation IDs in its stage-change audit.
+
+## Workspace session and staff context
+The local interface is served at /. Same-origin session endpoints:
+- GET /api/session/: CSRF token, authentication state and the signed-in user's active
+  company memberships. Anonymous callers receive no company data.
+- POST /api/session/login/: username/password; requires the bootstrap CSRF token.
+  Successful login rotates the token and returns updated session context.
+- POST /api/session/logout/: requires CSRF, clears authentication and returns anonymous context.
+- GET /api/staff/: active office members read active assignee IDs/names/roles in the
+  selected company only. Field staff cannot read the directory.
+
+Workspace/session responses are marked no-store. Browser requests opt out of caching and
+send credentials to the same origin only. Only the non-secret company preference is kept
+in sessionStorage. Cookie sessions use HttpOnly and SameSite=Lax; local settings are not
+production HTTPS/authentication configuration.
+
+Designers cannot reschedule/reassign another staff member's consultation to themselves.
+Completed field visits route assessment preparation to active office staff, or leave it
+unassigned for office review when no office membership exists.
