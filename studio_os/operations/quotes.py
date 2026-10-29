@@ -52,10 +52,12 @@ class QuoteRevisionSerializer(serializers.ModelSerializer):
 class QuoteSerializer(serializers.ModelSerializer):
     current_revision = QuoteRevisionSerializer(read_only=True)
     source_current = serializers.SerializerMethodField()
+    customer_name = serializers.CharField(source="assessment.consultation.lead.customer.name", read_only=True)
+    lead = serializers.IntegerField(source="assessment.consultation.lead_id", read_only=True)
 
     class Meta:
         model = Quote
-        fields = ["id", "assessment", "currency", "status", "version", "source_current",
+        fields = ["id", "assessment", "lead", "customer_name", "currency", "status", "version", "source_current",
                   "current_revision", "created_at"]
         read_only_fields = fields
 
@@ -201,3 +203,17 @@ class QuoteReviewView(APIView):
         update_versioned(quote, data["expected_version"], status=target)
         audit(request, quote, "QUOTE_" + command.upper(), data["note"], before)
         return Response(QuoteSerializer(quote).data)
+
+
+class QuoteListView(APIView):
+    def get(self, request):
+        org, membership = organization_for(request)
+        require_office_member(membership)
+        quotes = Quote.objects.filter(organization=org).select_related(
+            "assessment__consultation__lead__customer", "current_revision").order_by("-created_at", "-pk")
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            if status_filter not in Quote.Status.values:
+                raise ValidationError({"status": "Choose a valid quotation status"})
+            quotes = quotes.filter(status=status_filter)
+        return Response(QuoteSerializer(quotes, many=True).data)

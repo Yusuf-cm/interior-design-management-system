@@ -1,0 +1,37 @@
+{% load static studio_format %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estimate {{ quote.id }} · Revision {{ revision.number }} · {{ quote.organization.name }}</title>
+  <link rel="stylesheet" href="{% static 'studio_os/quote-print.css' %}">
+  <script defer src="{% static 'studio_os/quote-print.js' %}"></script>
+</head>
+<body>
+  <nav class="toolbar" aria-label="Estimate actions">
+    <a href="/#inquiry/{{ quote.assessment.consultation.lead_id }}/quotes">← Back to workspace</a>
+    <button type="button" id="print-estimate">Print / save as PDF</button>
+  </nav>
+  <main class="sheet">
+    <header><div><p class="eyebrow">{{ quote.organization.name }}</p><h1>Planning estimate</h1></div>
+      <div class="reference"><strong>#{{ quote.id }} / R{{ revision.number }}</strong><p>{{ revision.created_at|date:"j M Y" }}</p></div>
+    </header>
+    {% if not current %}<div class="stamp">Archived revision · Internal copy</div>
+    {% elif not approved %}<div class="stamp">Internal draft · Not approved for sharing</div>
+    {% else %}<div class="approved">Reviewed estimate · For discussion</div>{% endif %}
+    <section class="recipient"><p class="eyebrow">PREPARED FOR</p><h2>{{ customer.name }}</h2></section>
+    <section><p class="eyebrow">PROPOSED SCOPE</p><p class="scope">{{ revision.scope_snapshot }}</p></section>
+    {% if revision.provisional_reason_snapshot %}<p class="preliminary">Preliminary estimate. Measurements remain to be confirmed.</p>{% endif %}
+    <table><thead><tr><th>Work / material</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead>
+      <tbody>{% for item in revision.items %}<tr><td>{{ item.description }}</td><td>{{ item.quantity }}</td>
+        <td>{{ item.unit_price|decimal_money }}</td><td>{{ item.amount|decimal_money }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <div class="totals"><p><span>Subtotal</span><span>{{ revision.currency }} {{ revision.subtotal|decimal_money }}</span></p>
+      <p><span>Discount</span><span>{{ revision.currency }} {{ revision.discount|decimal_money }}</span></p>
+      <p><span>Tax · factor {{ revision.tax_rate }}</span><span>{{ revision.currency }} {{ revision.tax|decimal_money }}</span></p>
+      <p class="total"><span>Total</span><strong>{{ revision.currency }} {{ revision.total|decimal_money }}</strong></p>
+    </div>
+    <footer><p>Prepared for discussion. Scope and pricing require confirmation.</p><p>Estimate #{{ quote.id }} · Revision {{ revision.number }}</p></footer>
+  </main>
+</body>
+</html>

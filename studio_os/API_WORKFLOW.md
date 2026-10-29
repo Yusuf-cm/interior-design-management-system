@@ -248,3 +248,30 @@ production HTTPS/authentication configuration.
 Designers cannot reschedule/reassign another staff member's consultation to themselves.
 Completed field visits route assessment preparation to active office staff, or leave it
 unassigned for office review when no office membership exists.
+
+## Owner team management
+- GET/POST /api/team/: owners list studio memberships or create a new account/membership.
+  Creation fields: username, name, role, password. Existing usernames return 409 without
+  attaching or changing the account. Password is write-only and never audited.
+- PATCH /api/team/{membership_id}/: owner supplies expected_version, note, and role
+  and/or active. Cross-company IDs return 404. Last-active-owner removal returns 409.
+- Responses include membership id, user_id, username, name, role, active, version,
+  account_active and company-scoped open_actions count. Deactivation preserves work.
+- POST /api/session/password/: authenticated cookie session and CSRF required. Supply
+  current_password/new_password. Validated change rotates CSRF and refreshes the current
+  session hash; returns updated session bootstrap. No username/password reset targeting
+  another account is supported.
+
+Membership edits lock the company before checking owner availability where row locking
+is supported, and use version comparison. PostgreSQL concurrency is still unverified.
+
+## Quotation register and printable copies
+- GET /api/quotes/: office members receive studio-scoped estimates with lead and
+  customer_name. Optional status must be DRAFT, READY_FOR_REVIEW or APPROVED_TO_SHARE.
+- GET /quotes/{id}/print/?organization={company_id}: authenticated office-only printable
+  current revision. Optional revision={number} selects an archived revision belonging to
+  the same quotation/company. Another company's IDs remain unavailable.
+- Print responses are no-store. Only a current approved revision with a ready/current
+  assessment and non-lost lead receives the discussion-copy label. All other copies are
+  internal drafts or archived revisions. Internal notes/visit outcomes are never included.
+- Print is a read-only browser page. There is no issuing, sending or acceptance side effect.

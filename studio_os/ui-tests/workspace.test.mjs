@@ -22,7 +22,7 @@ function baseData(role="OWNER") {
     measurements_snapshot:assessment.measurements,provisional_reason_snapshot:"",currency:"KES",
     items:[{description:"Paint",quantity:"2.000",unit_price:"1000.00",amount:"2000.00"}],
     subtotal:"2000.00",discount:"0.00",tax_rate:"0.000000",tax:"0.00",total:"2000.00",created_at:"2026-10-19T12:00:00Z"};
-  const quote={id:40,assessment:30,currency:"KES",status:"READY_FOR_REVIEW",version:2,
+  const quote={id:40,assessment:30,lead:10,customer_name:"Amina",currency:"KES",status:"READY_FOR_REVIEW",version:2,
     source_current:true,current_revision:revision,revisions:[revision],created_at:"2026-10-19T12:00:00Z"};
   const visit={id:20,lead:10,assignee:1,location:"Lounge site",starts_at:"2027-01-02T10:00:00+03:00",
     ends_at:"2027-01-02T11:00:00+03:00",status:"COMPLETED",version:3,outcome:"Measured site"};
@@ -56,6 +56,8 @@ async function harness(t,{data=baseData(),authenticated=true,hash="today",handle
       else if(path==="/api/customers/")result={data:options.method?{id:6,...call.payload}:data.customers};
       else if(path==="/api/leads/")result={data:options.method?{id:11,...call.payload}:data.leads};
       else if(path==="/api/staff/")result={data:data.staff};
+      else if(path==="/api/quotes/")result={data:data.quotes||[data.quote]};
+      else if(path==="/api/team/")result={data:[{id:70,user_id:1,username:"owner",name:"Yusuf",role:"OWNER",active:true,account_active:true,version:1,open_actions:0}]};
       else if(path==="/api/consultations/")result={data:data.visits};
       else if(path==="/api/today/")result={data:options.headers["X-Organization-ID"]==="2"?[]:data.actions};
       else if(path==="/api/leads/10/")result={data:data.lead};
@@ -225,4 +227,51 @@ test("failed data request renders an error instead of invented records",async t=
   }});
   assert.match(app.select("#main").textContent,/Database unavailable/);
   assert.ok(app.select('[data-action="refresh"]'));
+});
+
+test("quotation register filters pending reviews by status and customer",async t=>{
+  const data=baseData();
+  data.quotes=[data.quote,{...data.quote,id:41,status:"DRAFT",customer_name:"Brian"}];
+  const app=await harness(t,{data,hash:"quotes"});
+  assert.match(app.select("#quote-list").textContent,/Amina/);
+  assert.match(app.select("#quote-list").textContent,/Brian/);
+  app.fill("#quote-filter","READY_FOR_REVIEW").dispatchEvent(new app.w.Event("change",{bubbles:true}));
+  assert.match(app.select("#quote-list").textContent,/Amina/);
+  assert.doesNotMatch(app.select("#quote-list").textContent,/Brian/);
+  app.fill("#quote-search","missing").dispatchEvent(new app.w.Event("input",{bubbles:true}));
+  assert.match(app.select("#quote-list").textContent,/No matching quotations/);
+});
+test("only owners see team management navigation",async t=>{
+  const app=await harness(t,{data:baseData("DESIGNER")});
+  assert.equal(app.select('[data-nav="team"]'),null);
+});
+test("owner team form sends initial password only in the create request",async t=>{
+  const app=await harness(t,{hash:"team"});
+  app.click('[data-action="team-new"]');
+  app.fill('#modal [name="name"]',"New designer");
+  app.fill('#modal [name="username"]',"new-designer");
+  app.fill('#modal [name="password"]',"Initial-Passphrase!2026");
+  app.submit("#editor");
+  await waitFor(()=>app.calls.some(c=>c.path==="/api/team/"&&c.options.method==="POST"));
+  const call=app.calls.find(c=>c.path==="/api/team/"&&c.options.method==="POST");
+  assert.equal(call.payload.role,"DESIGNER");
+  assert.equal(call.options.headers["X-Organization-ID"],"1");
+});
+test("quote print link carries company context and isolates the new tab",async t=>{
+  const app=await harness(t,{hash:"inquiry/10/quotes"});
+  app.click('[data-action="quote"]');
+  await waitFor(()=>app.select(".print-link"));
+  assert.equal(app.select(".print-link").getAttribute("href"),"/quotes/40/print/?organization=1");
+  assert.equal(app.select(".print-link").getAttribute("rel"),"noopener");
+});
+test("password confirmation mismatch is caught before sending credentials",async t=>{
+  const app=await harness(t);
+  app.click('[data-action="password"]');
+  app.fill('#modal [name="current_password"]',"Original-Passphrase!2026");
+  app.fill('#modal [name="new_password"]',"New-Passphrase!2026");
+  app.fill('#modal [name="confirm_password"]',"Different-Passphrase!2026");
+  app.submit("#editor");
+  await waitFor(()=>!app.select("#form-error").hidden);
+  assert.match(app.select("#form-error").textContent,/do not match/);
+  assert.equal(app.calls.some(c=>c.path==="/api/session/password/"),false);
 });

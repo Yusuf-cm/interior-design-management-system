@@ -1,6 +1,8 @@
 """Same-origin development workspace and session bootstrap."""
 import json
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import JsonResponse
 from django.middleware.csrf import get_token, rotate_token
 from django.shortcuts import render
@@ -81,3 +83,31 @@ class StaffDirectoryView(APIView):
         ).select_related("user").order_by("user__username")
         return Response([{"id": member.user_id, "name": member.user.get_full_name() or member.user.username,
                           "role": member.role} for member in members])
+
+
+@never_cache
+@csrf_protect
+@require_POST
+def change_password(request):
+    if not request.user.is_authenticated or not request.user.is_active:
+        return JsonResponse({"detail": "Sign in first"}, status=403)
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError()
+        current, new = data.get("current_password"), data.get("new_password")
+        if not isinstance(current, str) or not isinstance(new, str) or len(new) > 1024 or len(current) > 1024:
+            raise ValueError()
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"detail": "Enter current and new passwords"}, status=400)
+    if not request.user.check_password(current):
+        return JsonResponse({"detail": "Current password is incorrect"}, status=400)
+    try:
+        validate_password(new, user=request.user)
+    except DjangoValidationError as exc:
+        return JsonResponse({"new_password": exc.messages}, status=400)
+    request.user.set_password(new)
+    request.user.save(update_fields=["password"])
+    update_session_auth_hash(request, request.user)
+    rotate_token(request)
+    return JsonResponse(session_payload(request))

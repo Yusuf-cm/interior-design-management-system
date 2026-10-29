@@ -73,3 +73,36 @@ or mobile-device QA was run in this environment.
 Local development interface only. No production changes or deployment are included.
 There is no public signup, team-invitation screen, outbound delivery, payment handling,
 quotation acceptance or project conversion. Production auth/hosting remains a separate gate.
+
+## Team access and passwords
+Owners now have a Team screen. Add a teammate with a unique username, display name,
+studio role and initial password. Passwords must be at least 12 characters and pass
+similarity/common-password checks. Credentials are not emailed or logged. Give them to
+the teammate privately; they can use Change password after signing in.
+
+Existing usernames are never attached to a company or reset through this screen. Role
+and access changes apply only to the selected company's membership, with a reason and
+version check. Disabling membership preserves assignments/history. Review open actions
+and reassign work as appropriate. At least one active owner must remain.
+
+Change password applies to the signed-in account across its studios, verifies the
+current password and keeps the current session signed in. Other sessions lose their
+old password authentication state. Owners cannot reset another existing user's password
+through the Team screen. Django staff/superuser privileges are never granted here.
+
+## Quotation register and print copies
+The Quotations screen lists studio estimates and can filter pending owner reviews,
+drafts or approved estimates. Search by customer or quotation number.
+
+Open a quotation to use Print estimate / save as PDF. The new tab contains recorded
+line prices, totals, scope and revision number. Internal observation notes, staff
+outcomes and the private explanation of provisional authorization are omitted. A
+preliminary-estimate notice remains when measurements require confirmation.
+
+Current internally approved estimates are labelled for discussion. Drafts, changed
+sources and archived revisions carry explicit internal-copy labels. Viewing or printing
+does not send anything, record customer acceptance or change inquiry/quotation state.
+
+Verification update (2026-10-29): live desktop sign-in layout checked in the browser.
+Authenticated-screen, mobile and print-dialog browser QA remain outstanding. The
+additional API/DOM tests cover the new team, review register and print functionality.

@@ -12,12 +12,21 @@ from studio_os.operations.assessments import (
     AssessmentCreateView, AssessmentDetailView, AssessmentCommandView,
 )
 from studio_os.operations.quotes import (
-    QuoteCreateView, QuoteDetailView, QuoteRevisionView, QuoteReviewView,
+    QuoteCreateView, QuoteDetailView, QuoteRevisionView, QuoteReviewView, QuoteListView,
 )
 
-from studio_os.operations.workspace import workspace, session, sign_in, sign_out, StaffDirectoryView
+from studio_os.operations.workspace import workspace, session, sign_in, sign_out, change_password, StaffDirectoryView
+
+from studio_os.operations.team import TeamView, TeamMemberView
+
+from studio_os.operations.printing import print_quote
 
 urlpatterns = [
+    path("quotes/<int:pk>/print/", print_quote, name="quote-print"),
+    path("api/team/", TeamView.as_view()),
+    path("api/team/<int:pk>/", TeamMemberView.as_view()),
+    path("api/quotes/", QuoteListView.as_view()),
+    path("api/session/password/", change_password),
     path("", workspace, name="studio-workspace"),
     path("api/session/", session),
     path("api/session/login/", sign_in),

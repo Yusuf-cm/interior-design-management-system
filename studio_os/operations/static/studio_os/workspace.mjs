@@ -4,7 +4,7 @@ import {escapeHTML as h, human, formatDate, money, errorText, nairobiInput, from
 const root = document.querySelector("#app");
 const dialog = document.querySelector("#modal");
 const editor = document.querySelector("#editor");
-const state = {session:null, csrf:"", org:null, staff:[], customers:[], leads:[], visits:[],
+const state = {session:null, csrf:"", org:null, staff:[], customers:[], leads:[], visits:[], quotes:[], team:[],
   lead:null, generation:0, noticeTimer:null, saving:false};
 const office = () => state.org?.role !== "FIELD";
 const manager = () => ["OWNER","COORDINATOR"].includes(state.org?.role);
@@ -118,18 +118,18 @@ function loginScreen() {
 }
 function setSession(data) {
   state.session=data; state.csrf=data.csrf_token; state.lead=null;
-  state.customers=[];state.leads=[];state.visits=[];state.staff=[];
+  state.customers=[];state.leads=[];state.visits=[];state.staff=[];state.quotes=[];state.team=[];
   let saved;
   try {saved=sessionStorage.getItem("studio-org:"+data.user?.id);} catch {}
   state.org=data.organizations.find(org=>String(org.id)===saved)||data.organizations[0]||null;
 }
 function shell(active) {
-  const nav=[["today","◷","Today"],...(office()?[["inquiries","▤","Inquiries"],["visits","□","Site visits"],["customers","○","Customers"]]:[["visits","□","My visits"]])];
-  root.innerHTML=`<div class="shell"><aside class="sidebar">${brand}<div class="company"><label class="company-label" for="company">YOUR WORKSPACE</label><select id="company" class="company-select">${state.session.organizations.map(org=>`<option value="${org.id}" ${org.id===state.org.id?"selected":""}>${h(org.name)}</option>`).join("")}</select></div><nav class="nav" aria-label="Workspace">${nav.map(([path,icon,label])=>`<button data-nav="${path}" class="${active===path?"active":""}" ${active===path?'aria-current="page"':""}><span class="nav-symbol" aria-hidden="true">${icon}</span>${label}</button>`).join("")}</nav><div class="sidebar-foot"><strong>${h(state.session.user.name)}</strong><span class="role">${h(human(state.org.role))}</span>${button("Sign out","logout","","quiet")}</div></aside><div><header class="topbar"><span>${h(state.org.name)} / ${h(active==="inquiry"?"Inquiry":human(active))}</span><span>${h(formatDate(new Date().toISOString(),false))} · Nairobi time</span>${button("Refresh","refresh","","quiet")}</header><main id="main" tabindex="-1" aria-busy="true"><p class="muted">Loading your work…</p></main></div></div>`;
+  const nav=[["today","◷","Today"],...(office()?[["inquiries","▤","Inquiries"],["visits","□","Site visits"],["quotes","▧","Quotations"],["customers","○","Customers"],...(owner()?[["team","♧","Team"]]:[])]:[["visits","□","My visits"]])];
+  root.innerHTML=`<div class="shell"><aside class="sidebar">${brand}<div class="company"><label class="company-label" for="company">YOUR WORKSPACE</label><select id="company" class="company-select">${state.session.organizations.map(org=>`<option value="${org.id}" ${org.id===state.org.id?"selected":""}>${h(org.name)}</option>`).join("")}</select></div><nav class="nav" aria-label="Workspace">${nav.map(([path,icon,label])=>`<button data-nav="${path}" class="${active===path?"active":""}" ${active===path?'aria-current="page"':""}><span class="nav-symbol" aria-hidden="true">${icon}</span>${label}</button>`).join("")}</nav><div class="sidebar-foot"><strong>${h(state.session.user.name)}</strong><span class="role">${h(human(state.org.role))}</span>${button("Change password","password","","quiet")}${button("Sign out","logout","","quiet")}</div></aside><div><header class="topbar"><span>${h(state.org.name)} / ${h(active==="inquiry"?"Inquiry":human(active))}</span><span>${h(formatDate(new Date().toISOString(),false))} · Nairobi time</span>${button("Refresh","refresh","","quiet")}</header><main id="main" tabindex="-1" aria-busy="true"><p class="muted">Loading your work…</p></main></div></div>`;
   root.setAttribute("aria-busy","false");
   root.querySelector("#company").addEventListener("change",event=>{
     state.org=state.session.organizations.find(org=>org.id===Number(event.target.value));
-    state.lead=null;state.leads=[];state.customers=[];state.staff=[];state.visits=[];
+    state.lead=null;state.leads=[];state.customers=[];state.staff=[];state.visits=[];state.quotes=[];state.team=[];
     state.generation++;
     closeModal(true);
     try {sessionStorage.setItem("studio-org:"+state.session.user.id,state.org.id);} catch {}
@@ -143,14 +143,14 @@ async function render() {
     root.innerHTML=`<div class="unavailable">${brand}<h1 class="detail-head">No workspace assigned.</h1><p class="prose">Your account has no active company membership. Ask your studio owner to add you.</p>${button("Sign out","logout")}</div>`;return;
   }
   const [page="today",id,tab="overview"]=route();
-  const active=["today","inquiries","visits","customers","inquiry"].includes(page)?page:"today";
+  const active=["today","inquiries","visits","customers","inquiry","quotes","team"].includes(page)?page:"today";
   shell(active==="inquiry"?"inquiries":active);
   const main=root.querySelector("#main");
   try {
-    const paths=office()?["/api/customers/","/api/leads/","/api/staff/","/api/consultations/"]:["/api/consultations/"];
+    const paths=office()?["/api/customers/","/api/leads/","/api/staff/","/api/consultations/","/api/quotes/"]:["/api/consultations/"];
     const data=await Promise.all(paths.map(path=>api(path)));
     if(generation!==state.generation)return;
-    if(office()) [state.customers,state.leads,state.staff,state.visits]=data; else state.visits=data[0];
+    if(office()) [state.customers,state.leads,state.staff,state.visits,state.quotes]=data; else state.visits=data[0];
     if(active==="today") {
       const actions=await api("/api/today/");
       if(generation!==state.generation)return;
@@ -162,6 +162,12 @@ async function render() {
     } else if(active==="inquiries"&&office()) main.innerHTML=inquiriesPage();
     else if(active==="customers"&&office()) main.innerHTML=customersPage();
     else if(active==="visits") main.innerHTML=visitsPage();
+    else if(active==="quotes"&&office()) main.innerHTML=quoteRegisterPage();
+    else if(active==="team"&&owner()) {
+      const members=await api("/api/team/");
+      if(generation!==state.generation)return;
+      state.team=members; main.innerHTML=teamPage();
+    }
     else main.innerHTML=empty("This area is unavailable","Use Today or your assigned site visits.");
     main.setAttribute("aria-busy","false");
   } catch(error) {
@@ -177,7 +183,7 @@ function actionRow(action) {
 }
 function todayPage(actions) {
   const overdue=actions.filter(a=>a.due_at&&new Date(a.due_at)<new Date()).length;
-  const review=actions.filter(a=>a.origin_key?.startsWith("quote:")).length;
+  const review=state.quotes.filter(q=>q.status==="READY_FOR_REVIEW").length;
   const visits=state.visits.filter(v=>v.status==="CONFIRMED"&&new Date(v.ends_at)>=new Date());
   return pageHead("THE DAILY VIEW","Good work starts here.","Your follow-ups, site visits and decisions, in one place.",office()?button("+ New inquiry","new-inquiry","","primary"):"")+
     `<div class="stats"><div class="stat"><span>OPEN TODAY</span><strong>${actions.length}</strong><span>actions to move forward</span></div><div class="stat"><span>NEEDS ATTENTION</span><strong>${overdue}</strong><span>past their planned time</span></div><div class="stat"><span>OWNER REVIEW</span><strong>${review}</strong><span>drafts awaiting a decision</span></div></div><div class="grid"><section class="panel"><div class="panel-head"><h3>Your action list</h3><span class="pill-count">${actions.length} open</span></div>${actions.length?actions.map(actionRow).join(""):empty("A little breathing room.","No open actions are due today. Future work stays with its inquiry.")}</section><aside><section class="panel"><div class="panel-head"><h3>Coming up on site</h3></div>${visits.slice(0,4).map(visitRow).join("")||empty("No confirmed visits","Confirmed appointments will appear here.")}</section><div class="note" style="margin-top:20px">Changes to scope or prices stay in history. Owner review is an internal decision; it sends nothing to the customer.</div></aside></div>`;
@@ -215,6 +221,7 @@ function inquiryPage(lead,tab) {
 }
 
 root.addEventListener("input",event=>{
+  if(event.target.id==="quote-search")filterQuotes();
   if(event.target.id==="inquiry-search") {
     const query=event.target.value.toLowerCase();
     document.querySelector("#inquiry-list").innerHTML=inquiryRows(state.leads.filter(l=>
@@ -240,6 +247,9 @@ async function handleAction(action,id) {
   if(action==="open-inquiry")return go("inquiry/"+id+"/overview");
   if(action==="back-inquiries")return go("inquiries");
   if(action==="tab")return go("inquiry/"+state.lead.id+"/"+id);
+  if(action==="password")return passwordModal();
+  if(action==="team-new")return newTeamMember();
+  if(action==="team-edit")return editTeamMember(state.team.find(m=>m.id===Number(id)));
   if(action==="new-customer")return newCustomer();
   if(action==="new-inquiry")return newInquiry();
   if(action==="customer-inquiry")return newInquiry(Number(id));
@@ -482,6 +492,7 @@ async function quoteModal(quote) {
     (!quote.source_current?'<div class="note warn">The source assessment has changed or is not ready. Review it and save a new quotation revision before submitting.</div>':"")+
     revisionContent(quote.current_revision)+
     `<div class="actions">${editable&&assessment.status==="READY_FOR_ESTIMATE"?'<button type="button" class="secondary" id="revise-quote">New revision</button>':""}${editable&&quote.status==="DRAFT"&&quote.source_current?'<button type="button" class="primary" id="submit-quote">Submit for owner review</button>':""}${editable&&quote.status==="READY_FOR_REVIEW"&&owner()?'<button type="button" class="primary" id="approve-quote">Approve sharing internally</button>':""}${editable&&["READY_FOR_REVIEW","APPROVED_TO_SHARE"].includes(quote.status)?'<button type="button" class="secondary" id="withdraw-quote">Return to draft</button>':""}<button type="button" class="quiet" id="quote-source">Open source assessment →</button></div>`+
+    '<a class="secondary print-link" target="_blank" rel="noopener" href="/quotes/'+quote.id+'/print/?organization='+state.org.id+'">Print estimate / save as PDF ↗</a>'+
     note("Internal record only. Approval sends nothing and does not record customer acceptance.")+
     `<details><summary>Revision history (${quote.revisions.length})</summary>${quote.revisions.map(revision=>`<section class="card" style="margin-top:16px"><p class="eyebrow">REVISION ${revision.number} · ${h(formatDate(revision.created_at))}</p>${revisionContent(revision)}</section>`).join("")}</details>`);
   on("revise-quote",()=>quoteEditor(quote,assessment));
@@ -512,3 +523,61 @@ async function start() {
   }
 }
 start();
+
+function quoteRegisterPage() {
+  return pageHead("ESTIMATES & DECISIONS","Quotations, in view.","Find drafts that need review, return to their source, or open a print copy.")+
+    '<div class="filterbar"><input id="quote-search" type="search" placeholder="Find a customer or quotation…" aria-label="Search quotations"><label class="field">Status<select id="quote-filter"><option value="">All statuses</option><option value="DRAFT">Draft</option><option value="READY_FOR_REVIEW">Needs owner review</option><option value="APPROVED_TO_SHARE">Approved internally</option></select></label></div><section class="panel"><div class="panel-head"><h3>Quotation register</h3><span class="pill-count">'+state.quotes.length+'</span></div><div id="quote-list">'+quoteRows(state.quotes)+'</div></section>';
+}
+function quoteRows(quotes) {
+  return quotes.map(q=>'<div class="row"><div class="row-main"><button class="row-title" data-action="quote" data-id="'+q.id+'">'+h(q.customer_name||"Customer")+' · #'+q.id+'</button><p class="muted">Revision '+(q.current_revision?.number||"—")+' · '+h(money(q.current_revision?.total,q.currency))+(!q.source_current?" · Source needs review":"")+'</p></div><div class="actions">'+badge(q.status)+button("Open","quote",q.id)+'</div></div>').join("")||empty("No matching quotations","Ready assessments are the starting point for a quotation draft.");
+}
+function filterQuotes() {
+  const search=document.getElementById("quote-search")?.value.toLowerCase()||"";
+  const status=document.getElementById("quote-filter")?.value||"";
+  document.getElementById("quote-list").innerHTML=quoteRows(state.quotes.filter(q=>
+    (!status||q.status===status)&&((q.customer_name||"")+" #"+q.id).toLowerCase().includes(search)));
+}
+root.addEventListener("change",event=>{if(event.target.id==="quote-filter")filterQuotes();});
+
+function teamPage() {
+  return pageHead("PEOPLE & ACCESS","Your studio team.","Assign responsibility, manage access and keep work visible when someone leaves.",
+    button("+ Add teammate","team-new","","primary"))+
+    note("Disabling access keeps history and assigned work. Review their open actions and reassign them where needed.")+
+    '<section class="panel"><div class="panel-head"><h3>Studio access</h3><span class="pill-count">'+state.team.length+' people</span></div>'+
+    state.team.map(member=>'<div class="row"><div class="row-main"><h3>'+h(member.name)+'</h3><p class="muted">'+h(member.username)+' · '+member.open_actions+' open actions'+(member.user_id===state.session.user.id?" · You":"")+(!member.account_active?" · Account disabled":"")+'</p></div><div class="actions">'+badge(member.role)+badge(member.active?"Access enabled":"Access disabled",member.active?"":"gray")+button("Manage access","team-edit",member.id)+'</div></div>').join("")+'</section>';
+}
+function roleSelect(selected="DESIGNER") {
+  return '<label class="field">Studio role<select name="role">'+["OWNER","COORDINATOR","DESIGNER","FIELD"].map(role=>
+    '<option value="'+role+'" '+(role===selected?"selected":"")+'>'+h(human(role))+'</option>').join("")+'</select></label>';
+}
+function newTeamMember() {
+  openModal("Add a teammate",field("Display name","name","","text","required maxlength=150")+
+    field("Username","username","","text",'required maxlength="150" autocomplete="off"')+
+    roleSelect()+field("Initial password","password","","password",'required minlength="12" maxlength="1024" autocomplete="new-password"')+
+    note("Give the sign-in details to your teammate privately. Nothing is sent automatically. They can change their own password after signing in."),
+    form=>jsonPost("/api/team/",{name:value(form,"name"),username:value(form,"username"),
+      role:value(form,"role"),password:value(form,"password")}),"Create studio account");
+}
+function editTeamMember(member) {
+  if(!member)throw new Error("Teammate unavailable. Refresh this view.");
+  openModal("Manage "+member.name,roleSelect(member.role)+
+    '<label class="field">Studio access<select name="active"><option value="true" '+(member.active?"selected":"")+'>Enabled</option><option value="false" '+(!member.active?"selected":"")+'>Disabled</option></select></label>'+
+    note(member.open_actions+" open actions stay assigned. At least one active owner must remain.")+
+    area("Why is access changing?","note"),
+    async form=>{
+      await jsonPost("/api/team/"+member.id+"/",{expected_version:member.version,
+        role:value(form,"role"),active:value(form,"active")==="true",note:value(form,"note")},"PATCH");
+      setSession(await api("/api/session/"));
+    },"Save access");
+}
+function passwordModal() {
+  openModal("Change your password",
+    field("Current password","current_password","","password",'required autocomplete="current-password"')+
+    field("New password","new_password","","password",'required minlength="12" maxlength="1024" autocomplete="new-password"')+
+    field("Confirm new password","confirm_password","","password",'required minlength="12" maxlength="1024" autocomplete="new-password"'),
+    async form=>{
+      if(value(form,"new_password")!==value(form,"confirm_password"))throw new Error("New passwords do not match.");
+      setSession(await jsonPost("/api/session/password/",{
+        current_password:value(form,"current_password"),new_password:value(form,"new_password")}));
+    },"Change password");
+}
