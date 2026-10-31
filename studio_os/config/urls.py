@@ -1,3 +1,4 @@
+from studio_os.operations.projects import ScopeChangeCreateView, ScopeChangeDecisionView
 from django.urls import path
 from studio_os.operations.views import (
     CustomerListCreateView, DailyQueueView, LeadListCreateView,
@@ -27,6 +28,8 @@ from studio_os.operations.projects import (
 )
 
 urlpatterns = [
+    path("api/projects/<int:pk>/changes/", ScopeChangeCreateView.as_view()),
+    path("api/projects/<int:pk>/changes/<int:change_pk>/decision/", ScopeChangeDecisionView.as_view()),
     path("api/quotes/<int:pk>/approval-correction/", ApprovalCorrectionView.as_view()),
     path("api/quotes/<int:pk>/events/", QuoteEventView.as_view()),
     path("api/quotes/<int:pk>/project/", ProjectCreateView.as_view()),

@@ -238,3 +238,22 @@ class WorkItem(models.Model):
     blocker_reason = models.TextField(blank=True)
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ScopeChange(models.Model):
+    class Status(models.TextChoices):
+        PROPOSED = "PROPOSED"
+        APPROVED = "APPROVED"
+        REJECTED = "REJECTED"
+        WITHDRAWN = "WITHDRAWN"
+
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="scope_changes")
+    title = models.CharField(max_length=180)
+    description = models.TextField()
+    estimated_delta = models.DecimalField(max_digits=18, decimal_places=2)
+    schedule_days = models.IntegerField(default=0)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PROPOSED)
+    decision_reference = models.CharField(max_length=500, blank=True)
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)

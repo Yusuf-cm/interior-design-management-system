@@ -6,7 +6,7 @@ from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Activity, Lead, Membership, NextAction, Project, Quote, QuoteEvent, WorkItem
+from .models import Activity, Lead, Membership, NextAction, Project, Quote, QuoteEvent, WorkItem, ScopeChange
 from .views import Conflict, organization_for, update_versioned
 from .workflow_tasks import plan_task, settle_task
 
@@ -82,6 +82,8 @@ def project_data(project, request, membership, *, detail=False):
         data["scope"] = revision.scope_snapshot
         data["currency"] = revision.currency
         data["accepted_total"] = str(revision.total)
+        if detail:
+            data["scope_changes"] = ScopeChangeSerializer(project.scope_changes.filter(organization=project.organization).order_by("pk"), many=True).data
     if detail:
         data["work_items"] = WorkItemSerializer(items.order_by("due_at", "pk"), many=True).data
         if membership.role != Membership.Role.FIELD:
@@ -205,6 +207,12 @@ class ProjectCommandView(APIView):
         else:
             settle_task(org, f"project:{project.pk}:pause", cancelled=command=="cancel")
         if command == "cancel":
+            pending = ScopeChange.objects.filter(organization=org, project=project, status="PROPOSED")
+            for change in pending:
+                update_versioned(change, change.version, status="WITHDRAWN", decision_reference="Project cancelled")
+                settle_task(org, f"project:{project.pk}:change-{change.pk}", cancelled=True)
+                audit(request, project, "SCOPE_CHANGE_DECIDED", data["note"], scope_change_id=change.pk,
+                      after="WITHDRAWN", reference="Project cancelled")
             items = WorkItem.objects.filter(organization=org, project=project).exclude(
                 status__in=[WorkItem.Status.DONE, WorkItem.Status.CANCELLED])
             items.update(status=WorkItem.Status.CANCELLED, version=F("version")+1)
@@ -334,3 +342,66 @@ class WorkCommandView(APIView):
         audit(request, project, "WORK_ITEM_STATUS_CHANGED", data["note"], work_item_id=work.pk,
               before=previous, after=target)
         return Response(WorkItemSerializer(work).data)
+
+
+class ScopeChangeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScopeChange
+        fields = ["id", "project", "title", "description", "estimated_delta", "schedule_days",
+                  "status", "decision_reference", "version", "created_at"]
+        read_only_fields = fields
+
+
+class ScopeChangeInput(serializers.Serializer):
+    title = serializers.CharField(max_length=180)
+    description = serializers.CharField(max_length=12000)
+    estimated_delta = serializers.DecimalField(max_digits=18, decimal_places=2)
+    schedule_days = serializers.IntegerField(min_value=-3650, max_value=3650)
+    note = serializers.CharField(max_length=4000)
+
+
+class ScopeChangeCreateView(APIView):
+    @transaction.atomic
+    def post(self, request, pk):
+        org, member, project = project_for(request, pk, lock=True)
+        require_manager(member)
+        if project.status == Project.Status.CANCELLED:
+            raise Conflict("Cancelled projects cannot receive scope changes")
+        serializer = ScopeChangeInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = dict(serializer.validated_data)
+        note = data.pop("note")
+        change = ScopeChange.objects.create(organization=org, project=project, **data)
+        plan_task(org, project.lead, f"project:{project.pk}:change-{change.pk}",
+                  "Review scope change: " + change.title[:150], project.owner)
+        audit(request, project, "SCOPE_CHANGE_PROPOSED", note, scope_change_id=change.pk,
+              proposal=ScopeChangeSerializer(change).data)
+        return Response(ScopeChangeSerializer(change).data, status=status.HTTP_201_CREATED)
+
+
+class ScopeDecisionInput(serializers.Serializer):
+    expected_version = serializers.IntegerField(min_value=1)
+    command = serializers.ChoiceField(choices=["approve", "reject", "withdraw"])
+    reference = serializers.CharField(max_length=500)
+    note = serializers.CharField(max_length=4000)
+
+
+class ScopeChangeDecisionView(APIView):
+    @transaction.atomic
+    def post(self, request, pk, change_pk):
+        org, member, project = project_for(request, pk, lock=True)
+        if member.role != Membership.Role.OWNER:
+            raise PermissionDenied("Only owners record scope-change decisions")
+        change = get_object_or_404(ScopeChange.objects.select_for_update(), pk=change_pk,
+                                  project=project, organization=org)
+        serializer = ScopeDecisionInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        if project.status == Project.Status.CANCELLED or change.status != ScopeChange.Status.PROPOSED:
+            raise Conflict("This scope change is no longer open for review")
+        target = {"approve":"APPROVED", "reject":"REJECTED", "withdraw":"WITHDRAWN"}[data["command"]]
+        update_versioned(change, data["expected_version"], status=target, decision_reference=data["reference"])
+        settle_task(org, f"project:{project.pk}:change-{change.pk}", cancelled=target!="APPROVED")
+        audit(request, project, "SCOPE_CHANGE_DECIDED", data["note"], scope_change_id=change.pk,
+              after=target, reference=data["reference"])
+        return Response(ScopeChangeSerializer(change).data)

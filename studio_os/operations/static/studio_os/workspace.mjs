@@ -258,6 +258,8 @@ async function handleAction(action,id) {
   if(action==="tab")return go("inquiry/"+state.lead.id+"/"+id);
   if(action==="project")return go("project/"+id);
   if(action==="project-stage")return projectStage(state.project);
+  if(action==="new-change")return newScopeChange(state.project);
+  if(action==="scope-decision")return scopeDecision(state.project,(state.project.scope_changes||[]).find(change=>change.id===Number(id)));
   if(action==="new-work")return newWork(state.project);
   if(action==="work")return workModal(await api("/api/work/"+id+"/"));
   if(action==="password")return passwordModal();
@@ -667,6 +669,7 @@ function projectPage(project) {
     project.customer_name+" · "+human(project.status),manager()&&project.status!=="CANCELLED"?button("Update project","project-stage",project.id):"")+
     (office()?'<section class="card"><p class="eyebrow">ACCEPTED SCOPE · REVISION #'+project.accepted_revision+'</p><p class="prose">'+h(project.scope)+'</p><p class="muted">'+h(money(project.accepted_total,project.currency))+' · Planning baseline</p></section>':"")+
     (project.status==="PAUSED"?note("This project is paused. Start/completion updates are blocked until it resumes."):project.status==="CANCELLED"?note("This project was cancelled. Completed work and history remain available."):"")+
+    scopeChangesPanel(project)+
     '<section class="panel"><div class="panel-head"><h3>Assigned work</h3>'+
     (manager()&&project.status!=="CANCELLED"?button("+ Add work item","new-work",project.id,"primary"):"")+'</div>'+
     (items.map(work=>'<div class="row"><div class="row-main"><button class="row-title" data-action="work" data-id="'+work.id+'">'+h(work.title)+'</button><p class="muted">'+h(work.assignee_name)+' · '+h(formatDate(work.due_at))+'</p>'+
@@ -733,4 +736,30 @@ async function workModal(data) {
   });
   on("edit-work",()=>newWork(project,work));
   on("work-project",()=>{closeModal();go("project/"+project.id);});
+}
+
+
+function scopeChangesPanel(project) {
+  if(!office())return "";
+  return '<section class="panel"><div class="panel-head"><h3>Scope changes</h3>'+
+    (manager()&&project.status!=="CANCELLED"?button("+ Propose change","new-change",project.id):"")+'</div>'+
+    note("Changes keep the accepted baseline intact. Approval records a customer decision made outside this workspace; it creates no invoice or payment.")+
+    ((project.scope_changes||[]).map(change=>'<div class="row"><div class="row-main"><h3>'+h(change.title)+'</h3><p class="prose">'+h(change.description)+'</p><p class="muted">Estimated adjustment: '+h(money(change.estimated_delta,project.currency))+' · Schedule adjustment: '+h(change.schedule_days)+' days</p>'+
+      (change.decision_reference?'<p>'+h(change.decision_reference)+'</p>':"")+'</div><div class="actions">'+badge(change.status)+
+      (owner()&&change.status==="PROPOSED"&&project.status!=="CANCELLED"?button("Record decision","scope-decision",change.id):"")+'</div></div>').join("")||empty("No scope changes", "Propose changes here before planning additional scope."))+'</section>';
+}
+function newScopeChange(project) {
+  openModal("Propose scope change",field("Change title","title","","text","required maxlength=180")+
+    area("Scope and reason","description")+field("Estimated price adjustment · "+project.currency,"estimated_delta","0.00","number","required step=0.01")+
+    field("Schedule adjustment in days","schedule_days","0","number","required step=1 min=-3650 max=3650")+area("Internal note","note"),
+    form=>jsonPost("/api/projects/"+project.id+"/changes/",{title:value(form,"title"),description:value(form,"description"),
+      estimated_delta:value(form,"estimated_delta"),schedule_days:Number(value(form,"schedule_days")),note:value(form,"note")}));
+}
+function scopeDecision(project,change) {
+  if(!change)throw new Error("Refresh this project before recording a decision.");
+  openModal("Record scope-change decision",'<p>'+h(change.title)+'</p>'+note("Only approve after the customer has agreed to the described scope, price and schedule adjustment outside this workspace.")+
+    '<label class="field">Decision<select name="command"><option value="approve">Customer approved</option><option value="reject">Customer declined</option><option value="withdraw">Withdraw proposal</option></select></label>'+
+    field("Conversation / evidence reference","reference","","text","required maxlength=500")+area("Decision note","note"),
+    form=>jsonPost("/api/projects/"+project.id+"/changes/"+change.id+"/decision/",{expected_version:change.version,
+      command:value(form,"command"),reference:value(form,"reference"),note:value(form,"note")}));
 }

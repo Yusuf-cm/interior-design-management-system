@@ -369,3 +369,27 @@ test('unconverted approval offers a recorded correction with a reason',async t=>
   assert.equal(call.payload.expected_version,5);
   assert.equal(call.payload.reference,'Wrong conversation recorded');
 });
+
+test("scope proposal keeps decimal text and submits the project-scoped endpoint",async t=>{
+  const app=await harness(t,{hash:"project/60"});
+  app.click('[data-action="new-change"]');
+  app.fill('[name="title"]','Add hallway');app.fill('[name="description"]','Paint hallway');
+  app.fill('[name="estimated_delta"]','250.50');app.fill('[name="schedule_days"]','2');
+  app.fill('[name="note"]','Customer asked');app.submit('#editor');
+  await waitFor(()=>app.calls.some(call=>call.path==='/api/projects/60/changes/'));
+  const call=app.calls.find(call=>call.path==='/api/projects/60/changes/');
+  assert.equal(call.payload.estimated_delta,'250.50');assert.equal(call.payload.schedule_days,2);
+});
+test("owner scope decision includes version and evidence; coordinator has no decision control",async t=>{
+  const data=baseData();data.project.scope_changes=[{id:80,title:'Hallway',description:'<script>bad</script>',estimated_delta:'250.50',schedule_days:2,status:'PROPOSED',version:3}];
+  const app=await harness(t,{data,hash:'project/60'});
+  assert.equal(app.select('#main script'),null);
+  app.click('[data-action="scope-decision"]');app.fill('[name="reference"]','Call 42');
+  app.fill('[name="note"]','Agreed');app.submit('#editor');
+  await waitFor(()=>app.calls.some(call=>call.path.includes('/80/decision/')));
+  const call=app.calls.find(call=>call.path.includes('/80/decision/'));
+  assert.deepEqual(call.payload,{expected_version:3,command:'approve',reference:'Call 42',note:'Agreed'});
+  const coordinator=baseData('COORDINATOR');coordinator.project.scope_changes=data.project.scope_changes;
+  const second=await harness(t,{data:coordinator,hash:'project/60'});
+  assert.equal(second.select('[data-action="scope-decision"]'),null);
+});

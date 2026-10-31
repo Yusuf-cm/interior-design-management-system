@@ -145,3 +145,11 @@ reason; cancelled projects cannot be resumed or receive new work in this slice.
 Finishing every task does not mark the project complete. Handover inspection, scope-change
 approval and aftercare are the next workflow gates. Work descriptions are internal plans;
 they do not alter the accepted quotation or create approved extra scope.
+
+### Scope-change review
+
+Open a project to propose a scope change. Owners and coordinators enter the proposed scope, estimated price adjustment (negative for a credit), schedule adjustment in days, and an internal note. The proposal appears separately from the accepted quotation and creates a daily review action.
+
+Only an owner can record approval, rejection or withdrawal. Approval requires a reference to the customer agreement recorded outside the workspace and a decision note. Check that the customer agreed to scope, price and timing before selecting approval. A decision is final for that proposal; submit a new proposal for a later correction and explain its relationship in the note. Cancelling a project withdraws its remaining proposals and cancels their review tasks.
+
+These records do not change the accepted quotation, project dates, invoices or payments, and do not create work items. Plan any agreed work separately after review. Field staff cannot view the proposal register, estimated adjustments or decision references. Handover, snagging and aftercare remain future development steps.

@@ -341,3 +341,11 @@ can read studio work; non-managers can progress only their own assignment.
 
 Project/quote/work ownership is always server-derived. Source snapshots remain unchanged;
 work planning does not authorize extra scope, purchase materials or hire contractors.
+
+### Project scope changes
+
+`POST /api/projects/:id/changes/` — owner/coordinator only; body `title`, `description`, `estimated_delta` (decimal string, two places; signed), `schedule_days` (integer -3650..3650), `note`. Returns 201 with an immutable PROPOSED record and creates a project-linked daily review action. Cancelled projects return 409.
+
+`POST /api/projects/:id/changes/:change_id/decision/` — owner only; body `expected_version`, `command` (`approve`, `reject`, `withdraw`), required `reference` and `note`. Transitions an open proposal to APPROVED, REJECTED or WITHDRAWN. Stale versions or terminal proposals return 409. Cross-organization/project IDs return 404. Decision and task updates are atomic and audited.
+
+Office project detail includes `scope_changes`. Field responses omit the entire register. Proposals and decisions preserve accepted revision, total, project dates and work items. No invoice, payment, customer message or legal agreement is generated. A later correction requires a separate proposal; terminal decisions cannot be overwritten. Project cancellation withdraws open proposals and records the reason in project history.
