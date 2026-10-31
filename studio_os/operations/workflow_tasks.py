@@ -4,14 +4,18 @@ from django.utils import timezone
 from .models import NextAction
 
 
-def plan_task(org, lead, origin, title, assignee):
+_UNSET = object()
+
+
+def plan_task(org, lead, origin, title, assignee, *, due_at=_UNSET):
+    when = timezone.now() if due_at is _UNSET else due_at
     action, created = NextAction.objects.get_or_create(
         organization=org, origin_key=origin,
-        defaults={"lead": lead, "title": title, "assignee": assignee, "due_at": timezone.now()},
+        defaults={"lead": lead, "title": title, "assignee": assignee, "due_at": when},
     )
     if not created:
         NextAction.objects.filter(pk=action.pk).update(
-            title=title, assignee=assignee, due_at=timezone.now(),
+            title=title, assignee=assignee, due_at=when,
             done=False, cancelled=False, version=F("version") + 1)
     return action
 

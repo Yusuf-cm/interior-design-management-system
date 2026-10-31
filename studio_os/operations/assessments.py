@@ -178,6 +178,8 @@ class AssessmentCommandView(APIView):
             if quote:
                 Quote.objects.filter(pk=quote.pk).update(status=Quote.Status.DRAFT, version=F("version") + 1)
                 settle_task(org, f"quote:{quote.pk}:review", cancelled=True)
+                settle_task(org, f"quote:{quote.pk}:share", cancelled=True)
+                settle_task(org, f"quote:{quote.pk}:reply", cancelled=True)
                 Activity.objects.create(
                     organization=org, actor=request.user, lead=lead, kind="QUOTE_SOURCE_REOPENED",
                     details={"quote_id": quote.pk, "previous_status": quote.status,

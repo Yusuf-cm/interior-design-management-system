@@ -63,6 +63,8 @@ class Activity(models.Model):
 
 
 class NextAction(models.Model):
+    work_item = models.OneToOneField("WorkItem", null=True, blank=True, on_delete=models.PROTECT,
+                                     related_name="daily_action")
     origin_key = models.CharField(max_length=120, blank=True, default="")
     consultation = models.OneToOneField("Consultation", null=True, blank=True,
                                       on_delete=models.PROTECT, related_name="visit_action")
@@ -134,6 +136,10 @@ class Quote(models.Model):
         DRAFT = "DRAFT"
         REVIEW = "READY_FOR_REVIEW"
         APPROVED = "APPROVED_TO_SHARE"
+        SENT = "SENT"
+        ACCEPTED = "ACCEPTED"
+        REJECTED = "REJECTED"
+        REVISION_REQUESTED = "REVISION_REQUESTED"
 
     organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
     assessment = models.OneToOneField(Assessment, on_delete=models.PROTECT, related_name="quote")
@@ -175,3 +181,60 @@ class QuoteRevision(models.Model):
         if not self._state.adding:
             raise ValueError("Quote revisions are append-only; create a new revision")
         super().save(*args, **kwargs)
+
+
+class QuoteEvent(models.Model):
+    class Kind(models.TextChoices):
+        SHARED = "SHARED"
+        APPROVAL_CORRECTED = "APPROVAL_CORRECTED"
+        ACCEPTED = "ACCEPTED"
+        REJECTED = "REJECTED"
+        REVISION_REQUESTED = "REVISION_REQUESTED"
+
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    revision = models.ForeignKey(QuoteRevision, on_delete=models.PROTECT, related_name="events")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    kind = models.CharField(max_length=24, choices=Kind.choices)
+    reference = models.CharField(max_length=500)
+    note = models.TextField()
+    occurred_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Project(models.Model):
+    class Status(models.TextChoices):
+        PLANNED = "PLANNED"
+        ACTIVE = "ACTIVE"
+        PAUSED = "PAUSED"
+        CANCELLED = "CANCELLED"
+
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    lead = models.OneToOneField(Lead, on_delete=models.PROTECT, related_name="project")
+    accepted_revision = models.OneToOneField(QuoteRevision, on_delete=models.PROTECT, related_name="project")
+    title = models.CharField(max_length=180)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    start_date = models.DateField(null=True, blank=True)
+    target_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNED)
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class WorkItem(models.Model):
+    class Status(models.TextChoices):
+        TODO = "TODO"
+        IN_PROGRESS = "IN_PROGRESS"
+        BLOCKED = "BLOCKED"
+        DONE = "DONE"
+        CANCELLED = "CANCELLED"
+
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name="work_items")
+    title = models.CharField(max_length=180)
+    description = models.TextField(blank=True)
+    assignee = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    due_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
+    blocker_reason = models.TextField(blank=True)
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)

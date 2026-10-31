@@ -1,4 +1,4 @@
-# Studio.OS clean backend
+# Studio.OS development workspace
 
 Independent implementation. Does not import tutorial models, migrations or database. Django/DRF chosen for the application layer; domain policies are pure Python and tested independently.
 
@@ -26,3 +26,7 @@ A local interface now covers today's actions, customers, inquiries, site visits,
 assessments and internal quotation review. See [WORKSPACE_GUIDE.md](WORKSPACE_GUIDE.md)
 for account setup, launch commands and the walkthrough. The tutorial frontend is not used.
 No Node build is required to run the interface.
+
+The workspace now also records manual customer decisions and supports project planning,
+assigned work, blockers and progress. Handover and scope-change approval remain separate
+future gates; no messaging, signing, purchasing or payment is automated.

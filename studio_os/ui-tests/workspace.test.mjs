@@ -28,7 +28,12 @@ function baseData(role="OWNER") {
     ends_at:"2027-01-02T11:00:00+03:00",status:"COMPLETED",version:3,outcome:"Measured site"};
   const lead={id:10,customer:5,brief:"Lounge renovation",status:"NEW",version:1,
     created_at:"2026-10-19T12:00:00Z",actions:[],consultations:[visit],assessments:[assessment],quotes:[quote],activities:[]};
-  return {authenticated:true,csrf_token:"csrf-local-test",user:{id:1,name:"Yusuf"},
+  const work={id:70,project:60,title:"Prepare walls",description:"Protect the floor",assignee:1,
+    assignee_name:"Yusuf",due_at:null,status:"TODO",blocker_reason:"",version:1};
+  const project={id:60,title:"Amina lounge",customer_name:"Amina",status:"PLANNED",owner:1,
+    open_items:1,blocked_items:0,version:1,accepted_revision:50,quote:40,lead:10,
+    scope:"Paint lounge",currency:"KES",accepted_total:"2000.00",work_items:[work],history:[]};
+  return {work,project,projects:[project],authenticated:true,csrf_token:"csrf-local-test",user:{id:1,name:"Yusuf"},
     organizations:[{id:1,name:"Nuru Interiors",role},{id:2,name:"Second studio",role:"FIELD"}],
     customers:[{id:5,name:"Amina",email:"amina@example.test",phone:""}],
     staff:[{id:1,name:"Yusuf",role}],leads:[lead],visits:[visit],actions:[],assessment,quote,lead};
@@ -56,6 +61,10 @@ async function harness(t,{data=baseData(),authenticated=true,hash="today",handle
       else if(path==="/api/customers/")result={data:options.method?{id:6,...call.payload}:data.customers};
       else if(path==="/api/leads/")result={data:options.method?{id:11,...call.payload}:data.leads};
       else if(path==="/api/staff/")result={data:data.staff};
+      else if(path==="/api/projects/")result={data:data.projects};
+      else if(path==="/api/projects/60/")result={data:data.project};
+      else if(path==="/api/work/70/")result={data:{work_item:data.work,project:data.project}};
+      else if(path==="/api/quotes/40/project/")result={data:data.project};
       else if(path==="/api/quotes/")result={data:data.quotes||[data.quote]};
       else if(path==="/api/team/")result={data:[{id:70,user_id:1,username:"owner",name:"Yusuf",role:"OWNER",active:true,account_active:true,version:1,open_actions:0}]};
       else if(path==="/api/consultations/")result={data:data.visits};
@@ -274,4 +283,89 @@ test("password confirmation mismatch is caught before sending credentials",async
   await waitFor(()=>!app.select("#form-error").hidden);
   assert.match(app.select("#form-error").textContent,/do not match/);
   assert.equal(app.calls.some(c=>c.path==="/api/session/password/"),false);
+});
+
+test('work and project task origins open their dedicated workflows',()=>{
+  assert.deepEqual(utils.routeForAction({id:3,origin_key:'work:70:execute'}),{type:'work',id:70});
+  assert.deepEqual(utils.routeForAction({id:4,origin_key:'project:60:plan'}),{type:'project',id:60});
+});
+test('owner explicitly records manual sharing with a selected follow-up time',async t=>{
+  const data=baseData();data.quote.status='APPROVED_TO_SHARE';data.quote.version=3;data.lead.status='ASSESSED';
+  const app=await harness(t,{data,hash:'inquiry/10/quotes'});
+  app.click('[data-action="quote"]');
+  await waitFor(()=>app.select('#record-sharing'));
+  app.click('#record-sharing');
+  app.fill('#modal [name="reference"]','Email conversation reference');
+  app.fill('#modal [name="note"]','Customer has the approved revision');
+  app.fill('#modal [name="follow_up_due_at"]','2027-01-03T10:00');
+  app.submit('#editor');
+  await waitFor(()=>app.calls.some(call=>call.path==='/api/quotes/40/events/'));
+  const call=app.calls.find(call=>call.path==='/api/quotes/40/events/');
+  assert.equal(call.payload.kind,'SHARED');
+  assert.equal(call.payload.expected_version,3);
+  assert.equal(call.payload.follow_up_due_at,'2027-01-03T10:00:00+03:00');
+});
+test('recorded approval enables project planning without repeating approval',async t=>{
+  const data=baseData();data.quote.status='ACCEPTED';data.quote.version=5;data.lead.status='WON';
+  const app=await harness(t,{data,hash:'inquiry/10/quotes'});
+  app.click('[data-action="quote"]');
+  await waitFor(()=>app.select('#convert-project'));
+  assert.equal(app.select('#approve-quote'),null);
+  app.click('#convert-project');
+  app.fill('#modal [name="title"]','Amina lounge');
+  app.fill('#modal [name="note"]','Plan the recorded approved scope');
+  app.submit('#editor');
+  await waitFor(()=>app.calls.some(call=>call.path==='/api/quotes/40/project/'));
+  const call=app.calls.find(call=>call.path==='/api/quotes/40/project/');
+  assert.equal(call.payload.expected_version,5);
+  assert.equal(call.payload.owner,1);
+});
+test('field project screen hides financial baseline and planning controls',async t=>{
+  const app=await harness(t,{data:baseData('FIELD'),hash:'project/60'});
+  assert.match(app.select('#main').textContent,/Prepare walls/);
+  assert.doesNotMatch(app.select('#main').textContent,/KES|2,000|Planning baseline/);
+  assert.equal(app.select('[data-action="new-work"]'),null);
+  assert.equal(app.select('[data-action="project-stage"]'),null);
+});
+test('assigned field staff record progress through the work endpoint',async t=>{
+  const data=baseData('FIELD');data.project.status='ACTIVE';
+  const app=await harness(t,{data,hash:'project/60'});
+  app.click('[data-action="work"]');
+  await waitFor(()=>app.select('#work-start'));
+  assert.equal(app.select('#edit-work'),null);
+  app.click('#work-start');
+  app.fill('#modal [name="note"]','Floor protected and preparation started');
+  app.submit('#editor');
+  await waitFor(()=>app.calls.some(call=>call.path==='/api/work/70/command/'));
+  const call=app.calls.find(call=>call.path==='/api/work/70/command/');
+  assert.equal(call.payload.command,'start');
+  assert.equal(call.payload.expected_version,1);
+});
+test('manager can explicitly leave planned work unassigned',async t=>{
+  const app=await harness(t,{hash:'project/60'});
+  app.click('[data-action="new-work"]');
+  app.fill('#modal [name="title"]','Confirm materials');
+  app.fill('#modal [name="assignee"]','unassigned');
+  app.fill('#modal [name="note"]','Awaiting staffing decision');
+  app.submit('#editor');
+  await waitFor(()=>app.calls.some(call=>call.path==='/api/projects/60/work/'));
+  const call=app.calls.find(call=>call.path==='/api/projects/60/work/');
+  assert.equal(call.payload.assignee,null);
+  assert.equal(call.payload.due_at,null);
+});
+
+test('unconverted approval offers a recorded correction with a reason',async t=>{
+  const data=baseData();data.quote.status='ACCEPTED';data.quote.version=5;data.lead.status='WON';
+  const app=await harness(t,{data,hash:'inquiry/10/quotes'});
+  app.click('[data-action="quote"]');
+  await waitFor(()=>app.select('#correct-approval'));
+  app.click('#correct-approval');
+  app.fill('#modal [name="reference"]','Wrong conversation recorded');
+  app.fill('#modal [name="note"]','This customer had not approved the revision');
+  app.fill('#modal [name="follow_up_due_at"]','2027-01-03T10:00');
+  app.submit('#editor');
+  await waitFor(()=>app.calls.some(call=>call.path==='/api/quotes/40/approval-correction/'));
+  const call=app.calls.find(call=>call.path==='/api/quotes/40/approval-correction/');
+  assert.equal(call.payload.expected_version,5);
+  assert.equal(call.payload.reference,'Wrong conversation recorded');
 });

@@ -37,7 +37,7 @@ No Node build is required. Local data is ignored by Git. Nothing is deployed.
 7. Draft the quotation with descriptions, quantities, unit prices and optional discount
    and tax factor. The server calculates the totals.
 8. Open the quotation and submit for owner review. An owner can approve sharing internally
-   or return it to draft. Nothing is sent or accepted.
+   or return it to draft. Internal approval sends nothing; recording an already-received customer response is a separate owner action below.
 
 Quotation details show preserved revisions. Reopening source observations revokes approval
 and requires a refreshed revision. History retains stage changes and recorded notes.
@@ -71,8 +71,8 @@ or mobile-device QA was run in this environment.
 
 ## Boundaries
 Local development interface only. No production changes or deployment are included.
-There is no public signup, team-invitation screen, outbound delivery, payment handling,
-quotation acceptance or project conversion. Production auth/hosting remains a separate gate.
+There is no public signup or team-invitation delivery. Agreement signing, purchasing
+and payment processing are outside this workflow. Production auth/hosting remains a separate gate.
 
 ## Team access and passwords
 Owners now have a Team screen. Add a teammate with a unique username, display name,
@@ -106,3 +106,42 @@ does not send anything, record customer acceptance or change inquiry/quotation s
 Verification update (2026-10-29): live desktop sign-in layout checked in the browser.
 Authenticated-screen, mobile and print-dialog browser QA remain outstanding. The
 additional API/DOM tests cover the new team, review register and print functionality.
+
+
+## From quotation to internal project planning
+After internal approval, the owner can Record manual sharing against that revision.
+Enter when it actually happened, a reference/channel, notes and an explicit future
+follow-up time. This records staff-reported history; the system has not delivered or
+verified a customer message. Owners/coordinators can later reschedule the reminder.
+
+When a response arrives, the owner records Approval already received, Changes requested
+or Declined, with time/reference/notes. Responses cannot predate the recorded sharing.
+Recording approval moves the inquiry to Won; a dormant inquiry can be won through this
+evidence-bearing path, while the manual stage picker still cannot select Won.
+
+A shared revision cannot be edited until a customer change request is recorded. New
+revisions preserve prior prices and require internal review again. After approval is
+recorded, its source is frozen. An approval entered by mistake can be corrected with a
+reason before project creation; the original record remains and customer follow-up is
+restored. Once a project exists, this correction path is blocked to preserve its baseline.
+
+Use Plan project on the recorded approved quotation. Choose a project name, an active
+owner/coordinator, optional planning dates and a note. Repeating conversion returns the
+existing project instead of creating a duplicate. Scope and total remain linked to the
+accepted revision; no payment, hiring or agreement is created.
+
+## Project work
+Projects lists the studio's work. Owners/coordinators add work items, assign active
+staff and choose a due time or explicitly leave it undated/unassigned. Start the project
+before progressing its work. Assigned staff can start work, record a blocker, resume it
+and mark it done, always with an update note. Blockers are visible in the project and
+in the daily action list. Field staff see only their assigned work, not quote amounts,
+other people's tasks, accepted scope snapshots or internal project history.
+
+Pausing blocks work start/completion until a manager resumes the project. Cancelling
+cancels open tasks and keeps completed history. Managers can reopen a work item with a
+reason; cancelled projects cannot be resumed or receive new work in this slice.
+
+Finishing every task does not mark the project complete. Handover inspection, scope-change
+approval and aftercare are the next workflow gates. Work descriptions are internal plans;
+they do not alter the accepted quotation or create approved extra scope.

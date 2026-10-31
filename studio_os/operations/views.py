@@ -62,7 +62,7 @@ class ActionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = NextAction
-        fields = ["id", "lead", "customer_name", "title", "due_at", "done", "cancelled", "assignee", "version", "consultation", "origin_key"]
+        fields = ["id", "lead", "customer_name", "title", "due_at", "done", "cancelled", "assignee", "version", "consultation", "origin_key", "work_item"]
 
 
 class DailyQueueView(ListAPIView):
@@ -318,8 +318,8 @@ class ActionUpdateView(APIView):
         if membership.role not in {Membership.Role.OWNER, Membership.Role.COORDINATOR}:
             raise PermissionDenied("Only owners and coordinators can change planned actions")
         action = lock_action(NextAction.objects.filter(organization=org), pk, org)
-        if action.consultation_id:
-            raise Conflict("Change visit details through the consultation workflow")
+        if action.consultation_id or action.work_item_id:
+            raise Conflict("Change planned work through its source workflow")
         if action.done or action.cancelled:
             raise Conflict("Completed or cancelled actions cannot be rescheduled")
         serializer = ActionUpdateSerializer(

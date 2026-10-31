@@ -12,7 +12,7 @@ from studio_os.operations.assessments import (
     AssessmentCreateView, AssessmentDetailView, AssessmentCommandView,
 )
 from studio_os.operations.quotes import (
-    QuoteCreateView, QuoteDetailView, QuoteRevisionView, QuoteReviewView, QuoteListView,
+    QuoteCreateView, QuoteDetailView, QuoteRevisionView, QuoteReviewView, QuoteListView, QuoteEventView, ApprovalCorrectionView,
 )
 
 from studio_os.operations.workspace import workspace, session, sign_in, sign_out, change_password, StaffDirectoryView
@@ -21,7 +21,21 @@ from studio_os.operations.team import TeamView, TeamMemberView
 
 from studio_os.operations.printing import print_quote
 
+from studio_os.operations.projects import (
+    ProjectCreateView, ProjectListView, ProjectDetailView, ProjectCommandView,
+    WorkCreateView, WorkDetailView, WorkCommandView,
+)
+
 urlpatterns = [
+    path("api/quotes/<int:pk>/approval-correction/", ApprovalCorrectionView.as_view()),
+    path("api/quotes/<int:pk>/events/", QuoteEventView.as_view()),
+    path("api/quotes/<int:pk>/project/", ProjectCreateView.as_view()),
+    path("api/projects/", ProjectListView.as_view()),
+    path("api/projects/<int:pk>/", ProjectDetailView.as_view()),
+    path("api/projects/<int:pk>/command/", ProjectCommandView.as_view()),
+    path("api/projects/<int:pk>/work/", WorkCreateView.as_view()),
+    path("api/work/<int:pk>/", WorkDetailView.as_view()),
+    path("api/work/<int:pk>/command/", WorkCommandView.as_view()),
     path("quotes/<int:pk>/print/", print_quote, name="quote-print"),
     path("api/team/", TeamView.as_view()),
     path("api/team/<int:pk>/", TeamMemberView.as_view()),

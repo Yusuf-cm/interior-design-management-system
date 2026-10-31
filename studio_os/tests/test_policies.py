@@ -53,3 +53,12 @@ class DomainPolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DormantApprovalTests(unittest.TestCase):
+    def test_recorded_quote_approval_can_win_a_dormant_inquiry(self):
+        self.assertEqual(transition_lead(LeadStatus.DORMANT, LeadStatus.WON, accepted_quote=True), LeadStatus.WON)
+
+    def test_dormant_inquiry_cannot_win_without_recorded_approval(self):
+        with self.assertRaises(DomainError):
+            transition_lead(LeadStatus.DORMANT, LeadStatus.WON)

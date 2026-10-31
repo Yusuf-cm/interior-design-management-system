@@ -31,7 +31,7 @@ def print_quote(request, pk):
     if revision is None:
         return HttpResponseBadRequest('This estimate has no revision yet.')
     current = revision.pk == quote.current_revision_id
-    approved = (current and quote.status == Quote.Status.APPROVED
+    approved = (current and quote.status in {Quote.Status.APPROVED, Quote.Status.SENT, Quote.Status.ACCEPTED}
                 and quote.assessment.status == Assessment.Status.READY
                 and revision.assessment_version == quote.assessment.version
                 and quote.assessment.consultation.lead.status != Lead.Status.LOST)

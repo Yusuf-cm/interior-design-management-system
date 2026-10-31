@@ -1,7 +1,7 @@
 export function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
-export function human(value) { return String(value ?? "").toLowerCase().replaceAll("_", " ").replace(/^./, c => c.toUpperCase()); }
+export function human(value) { return ({SENT:"Shared manually",ACCEPTED:"Customer approval recorded",REJECTED:"Customer declined",REVISION_REQUESTED:"Changes requested"})[value] || String(value ?? "").toLowerCase().replaceAll("_", " ").replace(/^./, c => c.toUpperCase()); }
 export function formatDate(value, detailed = true) {
   if (!value) return "No date set";
   const date = new Date(value);
@@ -44,7 +44,7 @@ export function routeForAction(action, isField = false) {
   if (action.consultation) return {type:"visit", id:action.consultation};
   if (action.origin_key) {
     const [kind,id] = action.origin_key.split(":");
-    return {type:kind === "quote" ? "quote" : kind === "assessment" ? "assessment" : "visit", id:Number(id)};
+    return {type:({quote:"quote",assessment:"assessment",visit:"visit",project:"project",work:"work"})[kind]||"unsupported", id:Number(id)};
   }
   return {type:"action", id:action.id};
 }

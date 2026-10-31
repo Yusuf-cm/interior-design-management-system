@@ -4,7 +4,7 @@ import {escapeHTML as h, human, formatDate, money, errorText, nairobiInput, from
 const root = document.querySelector("#app");
 const dialog = document.querySelector("#modal");
 const editor = document.querySelector("#editor");
-const state = {session:null, csrf:"", org:null, staff:[], customers:[], leads:[], visits:[], quotes:[], team:[],
+const state = {session:null, csrf:"", org:null, staff:[], customers:[], leads:[], visits:[], quotes:[], team:[], projects:[], project:null,
   lead:null, generation:0, noticeTimer:null, saving:false};
 const office = () => state.org?.role !== "FIELD";
 const manager = () => ["OWNER","COORDINATOR"].includes(state.org?.role);
@@ -118,18 +118,18 @@ function loginScreen() {
 }
 function setSession(data) {
   state.session=data; state.csrf=data.csrf_token; state.lead=null;
-  state.customers=[];state.leads=[];state.visits=[];state.staff=[];state.quotes=[];state.team=[];
+  state.customers=[];state.leads=[];state.visits=[];state.staff=[];state.quotes=[];state.team=[];state.projects=[];state.project=null;
   let saved;
   try {saved=sessionStorage.getItem("studio-org:"+data.user?.id);} catch {}
   state.org=data.organizations.find(org=>String(org.id)===saved)||data.organizations[0]||null;
 }
 function shell(active) {
-  const nav=[["today","◷","Today"],...(office()?[["inquiries","▤","Inquiries"],["visits","□","Site visits"],["quotes","▧","Quotations"],["customers","○","Customers"],...(owner()?[["team","♧","Team"]]:[])]:[["visits","□","My visits"]])];
+  const nav=[["today","◷","Today"],["projects","▦",office()?"Projects":"My work"],...(office()?[["inquiries","▤","Inquiries"],["visits","□","Site visits"],["quotes","▧","Quotations"],["customers","○","Customers"],...(owner()?[["team","♧","Team"]]:[])]:[["visits","□","My visits"]])];
   root.innerHTML=`<div class="shell"><aside class="sidebar">${brand}<div class="company"><label class="company-label" for="company">YOUR WORKSPACE</label><select id="company" class="company-select">${state.session.organizations.map(org=>`<option value="${org.id}" ${org.id===state.org.id?"selected":""}>${h(org.name)}</option>`).join("")}</select></div><nav class="nav" aria-label="Workspace">${nav.map(([path,icon,label])=>`<button data-nav="${path}" class="${active===path?"active":""}" ${active===path?'aria-current="page"':""}><span class="nav-symbol" aria-hidden="true">${icon}</span>${label}</button>`).join("")}</nav><div class="sidebar-foot"><strong>${h(state.session.user.name)}</strong><span class="role">${h(human(state.org.role))}</span>${button("Change password","password","","quiet")}${button("Sign out","logout","","quiet")}</div></aside><div><header class="topbar"><span>${h(state.org.name)} / ${h(active==="inquiry"?"Inquiry":human(active))}</span><span>${h(formatDate(new Date().toISOString(),false))} · Nairobi time</span>${button("Refresh","refresh","","quiet")}</header><main id="main" tabindex="-1" aria-busy="true"><p class="muted">Loading your work…</p></main></div></div>`;
   root.setAttribute("aria-busy","false");
   root.querySelector("#company").addEventListener("change",event=>{
     state.org=state.session.organizations.find(org=>org.id===Number(event.target.value));
-    state.lead=null;state.leads=[];state.customers=[];state.staff=[];state.visits=[];state.quotes=[];state.team=[];
+    state.lead=null;state.leads=[];state.customers=[];state.staff=[];state.visits=[];state.quotes=[];state.team=[];state.projects=[];state.project=null;
     state.generation++;
     closeModal(true);
     try {sessionStorage.setItem("studio-org:"+state.session.user.id,state.org.id);} catch {}
@@ -143,8 +143,8 @@ async function render() {
     root.innerHTML=`<div class="unavailable">${brand}<h1 class="detail-head">No workspace assigned.</h1><p class="prose">Your account has no active company membership. Ask your studio owner to add you.</p>${button("Sign out","logout")}</div>`;return;
   }
   const [page="today",id,tab="overview"]=route();
-  const active=["today","inquiries","visits","customers","inquiry","quotes","team"].includes(page)?page:"today";
-  shell(active==="inquiry"?"inquiries":active);
+  const active=["today","inquiries","visits","customers","inquiry","quotes","team","projects","project"].includes(page)?page:"today";
+  shell(active==="inquiry"?"inquiries":active==="project"?"projects":active);
   const main=root.querySelector("#main");
   try {
     const paths=office()?["/api/customers/","/api/leads/","/api/staff/","/api/consultations/","/api/quotes/"]:["/api/consultations/"];
@@ -162,6 +162,15 @@ async function render() {
     } else if(active==="inquiries"&&office()) main.innerHTML=inquiriesPage();
     else if(active==="customers"&&office()) main.innerHTML=customersPage();
     else if(active==="visits") main.innerHTML=visitsPage();
+    else if(active==="projects") {
+      const projects=await api("/api/projects/");
+      if(generation!==state.generation)return;
+      state.projects=projects;main.innerHTML=projectsPage();
+    } else if(active==="project") {
+      const project=await api("/api/projects/"+encodeURIComponent(id)+"/");
+      if(generation!==state.generation)return;
+      state.project=project;main.innerHTML=projectPage(project);
+    }
     else if(active==="quotes"&&office()) main.innerHTML=quoteRegisterPage();
     else if(active==="team"&&owner()) {
       const members=await api("/api/team/");
@@ -247,6 +256,10 @@ async function handleAction(action,id) {
   if(action==="open-inquiry")return go("inquiry/"+id+"/overview");
   if(action==="back-inquiries")return go("inquiries");
   if(action==="tab")return go("inquiry/"+state.lead.id+"/"+id);
+  if(action==="project")return go("project/"+id);
+  if(action==="project-stage")return projectStage(state.project);
+  if(action==="new-work")return newWork(state.project);
+  if(action==="work")return workModal(await api("/api/work/"+id+"/"));
   if(action==="password")return passwordModal();
   if(action==="team-new")return newTeamMember();
   if(action==="team-edit")return editTeamMember(state.team.find(m=>m.id===Number(id)));
@@ -267,6 +280,9 @@ async function handleAction(action,id) {
     if(target.type==="visit")return visitModal(state.visits.find(v=>v.id===target.id));
     if(target.type==="assessment")return assessmentModal(await api("/api/assessments/"+target.id+"/"));
     if(target.type==="quote")return quoteModal(await api("/api/quotes/"+target.id+"/"));
+    if(target.type==="project")return go("project/"+target.id);
+    if(target.type==="work")return workModal(await api("/api/work/"+target.id+"/"));
+    throw new Error("Open the source record from its workspace section.");
   }
 }
 root.addEventListener("click",async event=>{
@@ -425,7 +441,7 @@ async function assessmentModal(assessment) {
     (assessment.provisional_reason?note("Owner authorized a preliminary estimate: "+assessment.provisional_reason):"")+
     `<div class="table-wrap"><table><thead><tr><th>Dimension</th><th>Value</th><th>Required</th></tr></thead><tbody>${assessment.measurements.map(m=>`<tr><td>${h(m.label)}</td><td>${h(m.value??"Unknown")} ${h(m.unit)}</td><td>${m.required?"Yes":"No"}</td></tr>`).join("")}</tbody></table></div><div class="actions">`+
     (editable&&assessment.status!=="READY_FOR_ESTIMATE"?'<button type="button" class="secondary" id="edit-assessment">Edit observations</button><button type="button" class="primary" id="ready-assessment">Review readiness</button>':"")+
-    (editable&&assessment.status==="READY_FOR_ESTIMATE"?'<button type="button" class="secondary" id="reopen-assessment">Reopen for correction</button>'+(!quote?'<button type="button" class="primary" id="draft-quote">Draft quotation</button>':""):"")+
+    (editable&&assessment.status==="READY_FOR_ESTIMATE"&&!["SENT","ACCEPTED"].includes(quote.status)?'<button type="button" class="secondary" id="reopen-assessment">Reopen for correction</button>'+(!quote?'<button type="button" class="primary" id="draft-quote">Draft quotation</button>':""):"")+
     (quote?'<button type="button" class="primary" id="open-assessment-quote">Open quotation</button>':"")+
     (lead?'<button type="button" class="quiet" id="assessment-inquiry">Open inquiry →</button>':"")+"</div>");
   on("edit-assessment",()=>assessmentEditor(assessment));
@@ -491,10 +507,36 @@ async function quoteModal(quote) {
     `<div class="card-head"><div>${badge(quote.status)}<p class="muted" style="margin-top:12px">Revision ${quote.current_revision.number} · ${h(formatDate(quote.current_revision.created_at))}</p></div></div>`+
     (!quote.source_current?'<div class="note warn">The source assessment has changed or is not ready. Review it and save a new quotation revision before submitting.</div>':"")+
     revisionContent(quote.current_revision)+
-    `<div class="actions">${editable&&assessment.status==="READY_FOR_ESTIMATE"?'<button type="button" class="secondary" id="revise-quote">New revision</button>':""}${editable&&quote.status==="DRAFT"&&quote.source_current?'<button type="button" class="primary" id="submit-quote">Submit for owner review</button>':""}${editable&&quote.status==="READY_FOR_REVIEW"&&owner()?'<button type="button" class="primary" id="approve-quote">Approve sharing internally</button>':""}${editable&&["READY_FOR_REVIEW","APPROVED_TO_SHARE"].includes(quote.status)?'<button type="button" class="secondary" id="withdraw-quote">Return to draft</button>':""}<button type="button" class="quiet" id="quote-source">Open source assessment →</button></div>`+
+    '<div class="actions">'+(editable&&owner()&&quote.status==="APPROVED_TO_SHARE"?'<button type="button" class="primary" id="record-sharing">Record manual sharing</button>':"")+
+    (editable&&owner()&&quote.status==="SENT"?'<button type="button" class="primary" id="record-customer-response">Record customer response</button>':"")+
+    (quote.status==="ACCEPTED"&&!quote.project_id&&owner()?'<button type="button" class="primary" id="convert-project">Plan project</button>':"")+
+    (quote.status==="ACCEPTED"&&!quote.project_id&&owner()?'<button type="button" class="secondary" id="correct-approval">Correct recorded approval</button>':"")+
+    (quote.project_id?'<button type="button" class="primary" id="open-linked-project">Open project →</button>':"")+
+    (quote.customer_follow_up&&manager()?'<button type="button" class="secondary" id="move-quote-followup">Reschedule customer follow-up</button>':"")+ '</div>'+
+    `<div class="actions">${editable&&assessment.status==="READY_FOR_ESTIMATE"&&!["SENT","ACCEPTED"].includes(quote.status)?'<button type="button" class="secondary" id="revise-quote">New revision</button>':""}${editable&&quote.status==="DRAFT"&&quote.source_current?'<button type="button" class="primary" id="submit-quote">Submit for owner review</button>':""}${editable&&quote.status==="READY_FOR_REVIEW"&&owner()?'<button type="button" class="primary" id="approve-quote">Approve sharing internally</button>':""}${editable&&["READY_FOR_REVIEW","APPROVED_TO_SHARE"].includes(quote.status)?'<button type="button" class="secondary" id="withdraw-quote">Return to draft</button>':""}<button type="button" class="quiet" id="quote-source">Open source assessment →</button></div>`+
     '<a class="secondary print-link" target="_blank" rel="noopener" href="/quotes/'+quote.id+'/print/?organization='+state.org.id+'">Print estimate / save as PDF ↗</a>'+
-    note("Internal record only. Approval sends nothing and does not record customer acceptance.")+
+    note("Sharing and customer decisions are recorded manually. This workspace sends no messages or agreements.")+
+    (quote.events?.length?'<details><summary>Recorded customer history</summary>'+quote.events.map(event=>'<p class="prose"><strong>'+h(human(event.kind))+'</strong> · '+h(formatDate(event.occurred_at))+'<br>'+h(event.reference)+'<br>'+h(event.note)+'</p>').join("")+'</details>':"")+
     `<details><summary>Revision history (${quote.revisions.length})</summary>${quote.revisions.map(revision=>`<section class="card" style="margin-top:16px"><p class="eyebrow">REVISION ${revision.number} · ${h(formatDate(revision.created_at))}</p>${revisionContent(revision)}</section>`).join("")}</details>`);
+  on("move-quote-followup",()=>{
+    const task=quote.customer_follow_up;
+    openModal("Reschedule customer follow-up",field("Follow-up time · Nairobi","due_at",nairobiInput(task.due_at),"datetime-local","required")+area("Reason for changing the reminder","note"),
+      form=>jsonPost("/api/actions/"+task.id+"/",{expected_version:task.version,
+        due_at:fromNairobiInput(value(form,"due_at")),note:value(form,"note")},"PATCH"));
+  });
+  on("record-sharing",()=>quoteEventModal(quote,true));
+  on("record-customer-response",()=>quoteEventModal(quote,false));
+  on("correct-approval",()=>{
+    openModal("Correct an approval entered by mistake",note("The original record stays in history. This returns the inquiry to customer follow-up and is only available before project creation.")+
+      field("Correction reference","reference","","text","required maxlength=500")+
+      area("Why was the approval record incorrect?","note")+
+      field("Customer follow-up time · Nairobi","follow_up_due_at","","datetime-local","required"),
+      form=>jsonPost("/api/quotes/"+quote.id+"/approval-correction/",{expected_version:quote.version,
+        reference:value(form,"reference"),note:value(form,"note"),
+        follow_up_due_at:fromNairobiInput(value(form,"follow_up_due_at"))}),"Save correction");
+  });
+  on("convert-project",()=>createProject(quote));
+  on("open-linked-project",()=>{closeModal();go("project/"+quote.project_id);});
   on("revise-quote",()=>quoteEditor(quote,assessment));
   on("submit-quote",()=>reviewQuote(quote,"submit"));
   on("approve-quote",()=>reviewQuote(quote,"approve"));
@@ -526,7 +568,7 @@ start();
 
 function quoteRegisterPage() {
   return pageHead("ESTIMATES & DECISIONS","Quotations, in view.","Find drafts that need review, return to their source, or open a print copy.")+
-    '<div class="filterbar"><input id="quote-search" type="search" placeholder="Find a customer or quotation…" aria-label="Search quotations"><label class="field">Status<select id="quote-filter"><option value="">All statuses</option><option value="DRAFT">Draft</option><option value="READY_FOR_REVIEW">Needs owner review</option><option value="APPROVED_TO_SHARE">Approved internally</option></select></label></div><section class="panel"><div class="panel-head"><h3>Quotation register</h3><span class="pill-count">'+state.quotes.length+'</span></div><div id="quote-list">'+quoteRows(state.quotes)+'</div></section>';
+    '<div class="filterbar"><input id="quote-search" type="search" placeholder="Find a customer or quotation…" aria-label="Search quotations"><label class="field">Status<select id="quote-filter"><option value="">All statuses</option><option value="DRAFT">Draft</option><option value="READY_FOR_REVIEW">Needs owner review</option><option value="APPROVED_TO_SHARE">Approved internally</option><option value="SENT">Shared manually</option><option value="ACCEPTED">Customer approval recorded</option><option value="REJECTED">Customer declined</option><option value="REVISION_REQUESTED">Changes requested</option></select></label></div><section class="panel"><div class="panel-head"><h3>Quotation register</h3><span class="pill-count">'+state.quotes.length+'</span></div><div id="quote-list">'+quoteRows(state.quotes)+'</div></section>';
 }
 function quoteRows(quotes) {
   return quotes.map(q=>'<div class="row"><div class="row-main"><button class="row-title" data-action="quote" data-id="'+q.id+'">'+h(q.customer_name||"Customer")+' · #'+q.id+'</button><p class="muted">Revision '+(q.current_revision?.number||"—")+' · '+h(money(q.current_revision?.total,q.currency))+(!q.source_current?" · Source needs review":"")+'</p></div><div class="actions">'+badge(q.status)+button("Open","quote",q.id)+'</div></div>').join("")||empty("No matching quotations","Ready assessments are the starting point for a quotation draft.");
@@ -580,4 +622,115 @@ function passwordModal() {
       setSession(await jsonPost("/api/session/password/",{
         current_password:value(form,"current_password"),new_password:value(form,"new_password")}));
     },"Change password");
+}
+
+function quoteEventModal(quote,sharing) {
+  openModal(sharing?"Record a quotation already shared":"Record customer feedback",
+    note("This is a record of something that already happened. It sends no message and signs no agreement.")+
+    (sharing?"":'<label class="field">Customer response<select name="kind"><option value="ACCEPTED">Approval already received</option><option value="REVISION_REQUESTED">Changes requested</option><option value="REJECTED">Declined</option></select></label>')+
+    field("When it happened · Nairobi","occurred_at",nairobiInput(new Date().toISOString()),"datetime-local","required")+
+    field("Reference / channel","reference","","text",'required maxlength="500" placeholder="For example: email or call reference"')+
+    area(sharing?"What was shared?":"What did the customer say?","note")+
+    (sharing?field("Customer follow-up time · Nairobi","follow_up_due_at","","datetime-local","required"):""),
+    form=>jsonPost("/api/quotes/"+quote.id+"/events/",{
+      expected_version:quote.version,kind:sharing?"SHARED":value(form,"kind"),
+      occurred_at:fromNairobiInput(value(form,"occurred_at")),
+      reference:value(form,"reference"),note:value(form,"note"),
+      ...(sharing?{follow_up_due_at:fromNairobiInput(value(form,"follow_up_due_at"))}:{}),
+    }),"Save record");
+}
+function createProject(quote) {
+  const planners=state.staff.filter(member=>["OWNER","COORDINATOR"].includes(member.role));
+  openModal("Plan the approved work",
+    note("Project scope and prices will link to accepted revision "+quote.current_revision.number+". This does not hire anyone, take payment or create an agreement.")+
+    field("Project name","title",(quote.customer_name||"Customer")+" · Interior work","text","required maxlength=180")+
+    '<label class="field">Project owner<select name="owner" required>'+planners.map(member=>'<option value="'+member.id+'">'+h(member.name)+'</option>').join("")+'</select></label>'+
+    '<div class="split">'+field("Planned start (optional)","start_date","","date")+field("Target date (optional)","target_date","","date")+'</div>'+
+    area("Planning note","note"),
+    async form=>{
+      const project=await jsonPost("/api/quotes/"+quote.id+"/project/",{expected_version:quote.version,
+        title:value(form,"title"),owner:Number(value(form,"owner")),start_date:value(form,"start_date")||null,
+        target_date:value(form,"target_date")||null,note:value(form,"note")});
+      go("project/"+project.id);
+    },"Create project plan");
+}
+function projectsPage() {
+  return pageHead("WORK IN MOTION",office()?"Projects":"Your assigned work",
+    office()?"Plan and track work against the recorded customer approval.":"Open a project to update the work assigned to you.")+
+    '<section class="panel"><div class="panel-head"><h3>Project register</h3></div>'+
+    (state.projects.map(project=>'<div class="row"><div class="row-main"><button class="row-title" data-action="project" data-id="'+project.id+'">'+h(project.title)+'</button><p class="muted">'+h(project.customer_name)+' · '+project.open_items+' open · '+project.blocked_items+' blocked</p></div><div class="actions">'+badge(project.status)+button("Open","project",project.id)+'</div></div>').join("")||
+      empty("No projects here yet",office()?"Record customer approval of a reviewed quotation, then create its project plan.":"Assigned project work will appear here."))+'</section>';
+}
+function projectPage(project) {
+  const items=project.work_items||[];
+  return pageHead("PROJECT / "+project.id,project.title,
+    project.customer_name+" · "+human(project.status),manager()&&project.status!=="CANCELLED"?button("Update project","project-stage",project.id):"")+
+    (office()?'<section class="card"><p class="eyebrow">ACCEPTED SCOPE · REVISION #'+project.accepted_revision+'</p><p class="prose">'+h(project.scope)+'</p><p class="muted">'+h(money(project.accepted_total,project.currency))+' · Planning baseline</p></section>':"")+
+    (project.status==="PAUSED"?note("This project is paused. Start/completion updates are blocked until it resumes."):project.status==="CANCELLED"?note("This project was cancelled. Completed work and history remain available."):"")+
+    '<section class="panel"><div class="panel-head"><h3>Assigned work</h3>'+
+    (manager()&&project.status!=="CANCELLED"?button("+ Add work item","new-work",project.id,"primary"):"")+'</div>'+
+    (items.map(work=>'<div class="row"><div class="row-main"><button class="row-title" data-action="work" data-id="'+work.id+'">'+h(work.title)+'</button><p class="muted">'+h(work.assignee_name)+' · '+h(formatDate(work.due_at))+'</p>'+
+      (work.blocker_reason?'<p class="muted">Blocked: '+h(work.blocker_reason)+'</p>':"")+'</div><div class="actions">'+badge(work.status,work.status==="BLOCKED"?"warm":"")+button("Open","work",work.id)+'</div></div>').join("")||
+      empty("No assigned work yet",manager()?"Add the next tasks and assign active staff.":"Your assigned tasks will appear here."))+'</section>'+
+    (office()&&project.history?.length?'<section class="card" style="margin-top:24px"><p class="eyebrow">PROJECT HISTORY</p><div class="timeline">'+[...project.history].reverse().map(event=>'<article class="event"><time>'+h(formatDate(event.created_at))+'</time><h3>'+h(human(event.kind))+'</h3><p>'+h(event.details.note)+'</p></article>').join("")+'</div></section>':"");
+}
+function projectStage(project) {
+  const commands=({PLANNED:[["start","Start project"],["cancel","Cancel project"]],
+    ACTIVE:[["pause","Pause project"],["cancel","Cancel project"]],
+    PAUSED:[["resume","Resume project"],["cancel","Cancel project"]]})[project.status]||[];
+  if(!commands.length)throw new Error("No project transition is available.");
+  openModal("Update project",
+    '<label class="field">Change<select name="command">'+commands.map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join("")+'</select></label>'+
+    area("Reason / update","note")+note("Cancelling a project cancels open work items. It keeps completed history and changes no payment or agreement."),
+    form=>jsonPost("/api/projects/"+project.id+"/command/",{expected_version:project.version,
+      command:value(form,"command"),note:value(form,"note")}));
+}
+function workAssignee(selected) {
+  const inactive=selected&&!state.staff.some(member=>member.id===selected);
+  return '<label class="field">Assigned to<select name="assignee" required>'+(inactive?'<option value="" disabled selected>Previous assignee inactive — choose staff</option>':"")+'<option value="unassigned" '+(selected===null?'selected':'')+'>Unassigned — office review</option>'+
+    staffOptions(selected)+'</select></label>';
+}
+function newWork(project,work=null) {
+  openModal(work?"Update planned work":"Plan a work item",
+    field("What needs to happen?","title",work?.title||"","text","required maxlength=180")+
+    area("Work details","description",work?.description||"",false)+
+    workAssignee(work?work.assignee:state.session.user.id)+
+    field("Planned time · Nairobi (optional)","due_at",nairobiInput(work?.due_at),"datetime-local")+
+    area(work?"Reason for change":"Planning note","note"),
+    form=>{
+      const payload={title:value(form,"title"),description:value(form,"description"),
+        assignee:value(form,"assignee")==="unassigned"?null:Number(value(form,"assignee")),
+        due_at:value(form,"due_at")?fromNairobiInput(value(form,"due_at")):null,note:value(form,"note")};
+      return work?jsonPost("/api/work/"+work.id+"/",{...payload,expected_version:work.version},"PATCH"):
+        jsonPost("/api/projects/"+project.id+"/work/",payload);
+    },"Save work item");
+}
+async function workModal(data) {
+  const work=data.work_item, project=data.project;
+  const mayProgress=manager()||work.assignee===state.session.user.id;
+  let commands=[];
+  if(mayProgress&&project.status!=="CANCELLED") {
+    if(project.status==="ACTIVE"&&work.status==="TODO")commands.push(["start","Start work"]);
+    if(["TODO","IN_PROGRESS"].includes(work.status))commands.push(["block","Record blocker"]);
+    if(project.status==="ACTIVE"&&work.status==="BLOCKED")commands.push(["unblock","Resume work"]);
+    if(project.status==="ACTIVE"&&work.status==="IN_PROGRESS")commands.push(["done","Mark work complete"]);
+    if(manager()) {
+      if(["TODO","IN_PROGRESS","BLOCKED"].includes(work.status))commands.push(["cancel","Cancel work item"]);
+      if(["DONE","CANCELLED"].includes(work.status))commands.push(["reopen","Reopen work"]);
+    }
+  }
+  readOnly(work.title,badge(work.status)+
+    '<p class="prose">'+h(work.description||"No additional work details recorded.")+'</p><p class="muted">'+h(work.assignee_name)+' · '+h(formatDate(work.due_at))+'</p>'+
+    (work.blocker_reason?note("Blocker: "+work.blocker_reason):"")+
+    (project.status!=="ACTIVE"?note("Project is "+human(project.status).toLowerCase()+". Work can progress once the project is active."):"")+
+    '<div class="actions">'+commands.map(([key,label])=>'<button type="button" class="secondary" id="work-'+key+'">'+label+'</button>').join("")+
+    (manager()&&project.status!=="CANCELLED"&&!["DONE","CANCELLED"].includes(work.status)?'<button type="button" class="secondary" id="edit-work">Change plan / assignment</button>':"")+
+    '<button type="button" class="quiet" id="work-project">Open project →</button></div>');
+  for(const [command,label] of commands) on("work-"+command,()=>{
+    openModal(label,area(command==="block"?"What is preventing the work?":"What changed?","note"),
+      form=>jsonPost("/api/work/"+work.id+"/command/",{expected_version:work.version,
+        command,note:value(form,"note")}),"Record update");
+  });
+  on("edit-work",()=>newWork(project,work));
+  on("work-project",()=>{closeModal();go("project/"+project.id);});
 }

@@ -215,8 +215,9 @@ and READY_FOR_REVIEW status. It sets APPROVED_TO_SHARE and completes the review 
 return_to_draft withdraws a pending/approved draft and cancels its pending review task.
 Retries with stale versions return 409 without duplicate reviews or revisions.
 
-Approval is an internal record only. No sending, acceptance, signature, payment or project
-conversion endpoint exists. An approved draft does not mark an inquiry QUOTED or WON.
+Approval is an internal record only. Sending, signature and payment endpoints do not exist. Internal approval does not mark
+an inquiry QUOTED or WON. Owner-recorded sharing/customer responses and project conversion
+use the dedicated endpoints below.
 
 ### Workflow tasks
 New assessment-preparation, estimate-preparation, recheck and owner-review tasks have
@@ -267,7 +268,8 @@ is supported, and use version comparison. PostgreSQL concurrency is still unveri
 
 ## Quotation register and printable copies
 - GET /api/quotes/: office members receive studio-scoped estimates with lead and
-  customer_name. Optional status must be DRAFT, READY_FOR_REVIEW or APPROVED_TO_SHARE.
+  customer_name. Optional status accepts a current Quote.Status value, including DRAFT,
+  READY_FOR_REVIEW, APPROVED_TO_SHARE, SENT, ACCEPTED, REJECTED or REVISION_REQUESTED.
 - GET /quotes/{id}/print/?organization={company_id}: authenticated office-only printable
   current revision. Optional revision={number} selects an archived revision belonging to
   the same quotation/company. Another company's IDs remain unavailable.
@@ -275,3 +277,67 @@ is supported, and use version comparison. PostgreSQL concurrency is still unveri
   assessment and non-lost lead receives the discussion-copy label. All other copies are
   internal drafts or archived revisions. Internal notes/visit outcomes are never included.
 - Print is a read-only browser page. There is no issuing, sending or acceptance side effect.
+
+
+## Recorded quote events (staff-entered history only)
+POST /api/quotes/{id}/events/ is owner-only. Fields: expected_version, kind, occurred_at,
+reference, note. Kinds: SHARED, ACCEPTED, REJECTED, REVISION_REQUESTED. SHARED additionally
+requires future follow_up_due_at. These routes send/sign nothing and do not independently
+verify a customer communication. Event time must be past/current and not predate the
+revision's creation minute. Responses cannot predate recorded sharing.
+
+SHARED requires current approved source/revision, records SENT and moves ASSESSED to
+QUOTED. A response requires SENT. ACCEPTED records WON only with current shared-revision
+evidence and a quoted/dormant inquiry; manual stage updates cannot claim acceptance.
+REJECTED records decline and queues internal review without automatically closing the
+whole inquiry. REVISION_REQUESTED enables a new immutable revision from customer feedback.
+SENT/ACCEPTED cannot be silently revised. Customer events and their references are returned
+in quotation detail, preserving prior responses across revisions.
+
+POST /api/quotes/{id}/approval-correction/ is owner-only. Supply expected_version,
+reference, note and future follow_up_due_at. It corrects an ACCEPTED record only while
+no project exists, appends APPROVAL_CORRECTED, returns the quote to SENT and inquiry to
+QUOTED, and restores follow-up. Original events remain. After conversion this is blocked.
+
+Quote responses include project_id and customer_follow_up (id/time/version/assignee_id).
+Owners/coordinators may reschedule the internal reminder via ordinary action PATCH;
+it does not create another customer event. Version conflicts reject stale retries.
+
+## Projects and assigned work
+| Method | Route | Scope |
+| --- | --- | --- |
+| POST | /api/quotes/{id}/project/ | Owner converts recorded accepted revision once |
+| GET | /api/projects/ | Office: studio projects; field: assigned projects only |
+| GET | /api/projects/{id}/ | Project baseline/history for office; field data redacted |
+| POST | /api/projects/{id}/command/ | Owner/coordinator: start, pause, resume, cancel |
+| POST | /api/projects/{id}/work/ | Owner/coordinator plans work |
+| GET/PATCH | /api/work/{id}/ | Assigned field/office reads; manager edits planning |
+| POST | /api/work/{id}/command/ | Assigned staff progress; manager cancels/reopens |
+
+Conversion fields: expected_version (quote), title, owner (active owner/coordinator),
+optional start_date/target_date and note. The quote must have an ACCEPTED event for its
+current revision and a WON inquiry. Unique accepted-revision and inquiry links prevent
+duplicate projects. Repeated conversion returns the existing project (200); first use 201.
+
+Project command fields: expected_version, command, note. PLANNED -> start -> ACTIVE;
+ACTIVE -> pause -> PAUSED -> resume -> ACTIVE. Cancel preserves completed work and cancels
+open work/reminders. Completion/handover is deliberately gated behind future workflows.
+
+Work creation fields: title, optional description, assignee (active studio user or null),
+due_at (datetime or null), note. Planning PATCH requires expected_version/note and at least
+one editable field. Completed/cancelled work must be reopened before planning changes.
+
+Work commands require expected_version, command, note: start (TODO -> IN_PROGRESS), block
+(TODO/IN_PROGRESS -> BLOCKED), unblock (BLOCKED -> IN_PROGRESS), done (IN_PROGRESS -> DONE),
+cancel, reopen. Start/unblock/done require an ACTIVE project. Cancel/reopen require a
+manager. Project cancellation prevents further updates. Blocker notes are retained as
+current blocker_reason and all transitions are audited with actor/project/work references.
+
+Work reminders have a unique work_item link and stable origin. They are synchronized from
+work state; generic task completion/editing cannot bypass the work workflow. Field project
+responses omit accepted prices/currency, quotation/revision links, full accepted scope and
+project audit history, and include only that person's assigned items/counts. Office users
+can read studio work; non-managers can progress only their own assignment.
+
+Project/quote/work ownership is always server-derived. Source snapshots remain unchanged;
+work planning does not authorize extra scope, purchase materials or hire contractors.

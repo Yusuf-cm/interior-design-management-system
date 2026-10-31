@@ -27,7 +27,7 @@ LEAD_TRANSITIONS = {
     LeadStatus.CONSULTATION_BOOKED: {LeadStatus.ASSESSED, LeadStatus.LOST},
     LeadStatus.ASSESSED: {LeadStatus.QUOTED, LeadStatus.LOST},
     LeadStatus.QUOTED: {LeadStatus.WON, LeadStatus.LOST, LeadStatus.DORMANT},
-    LeadStatus.DORMANT: {LeadStatus.CONTACTED, LeadStatus.LOST},
+    LeadStatus.DORMANT: {LeadStatus.CONTACTED, LeadStatus.LOST, LeadStatus.WON},
     LeadStatus.WON: set(),
     LeadStatus.LOST: set(),
 }
@@ -72,3 +72,4 @@ def quote_total(lines, *, discount=Decimal("0"), tax_rate=Decimal("0")):
 
 def should_prepare_reminder(*, completed: bool, opted_out: bool, disputed: bool):
     return not (completed or opted_out or disputed)
+
